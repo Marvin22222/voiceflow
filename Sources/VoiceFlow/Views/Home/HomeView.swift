@@ -21,6 +21,7 @@ struct HomeView: View {
     // MARK: - State
     
     @StateObject private var viewModel: HomeViewModel
+    // TODO(#21): Settings-Sheet hier einhängen (.sheet(isPresented: $showSettings))
     @State private var showSettings = false
     
     // MARK: - Initialization
@@ -41,14 +42,19 @@ struct HomeView: View {
         ZStack {
             AppColors.backgroundDark.ignoresSafeArea()
             
-            VStack(spacing: Spacing.lg) {
-                header
-                Spacer()
-                micButton
-                Spacer()
-                modelSelector
+            GeometryReader { geo in
+                VStack(spacing: Spacing.lg) {
+                    header
+                    title
+                    // 30 % vom oberen Rand minus halbe Button-Höhe → Button-Zentrum auf ~30 %
+                    Spacer().frame(height: max(0, geo.size.height * 0.3 - 50))
+                    micButton
+                    Spacer()
+                    hintView
+                    modelSelector
+                }
+                .padding(Spacing.md)
             }
-            .padding(Spacing.md)
         }
         .task {
             await viewModel.onAppear()
@@ -82,6 +88,19 @@ struct HomeView: View {
         }
     }
     
+    private var title: some View {
+        Text("VoiceFlow")
+            .font(.title2)
+            .lineLimit(1)
+            .accessibilityAddTraits(.isHeader)
+    }
+    
+    private var hintView: some View {
+        Text("Press and hold")
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+    }
+    
     private var micButton: some View {
         MicButton(
             isRecording: viewModel.isRecording,
@@ -97,6 +116,7 @@ struct HomeView: View {
     
     private var modelSelector: some View {
         VStack(spacing: Spacing.sm) {
+            // TODO(#23): transcribedText + Copy/Reuse-Buttons (Result Screen)
             if !viewModel.transcribedText.isEmpty {
                 Text(viewModel.transcribedText)
                     .font(.body)
@@ -107,10 +127,6 @@ struct HomeView: View {
                     .background(AppColors.surfaceDark)
                     .clipShape(RoundedRectangle(cornerRadius: Sizing.cornerRadius))
                     .frame(maxHeight: 100)
-            } else {
-                Text("Tap and hold to dictate")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
             }
             
             HStack(spacing: Spacing.md) {
@@ -118,6 +134,7 @@ struct HomeView: View {
                     ModelBadge(model: activeModel)
                 }
                 
+                // TODO(#XX): Switch-Model-Button → Picker-Screen
                 Button {
                     // TODO: Show model picker
                 } label: {
@@ -130,92 +147,6 @@ struct HomeView: View {
                 }
             }
         }
-    }
-}
-
-// MARK: - MicButton
-
-/// Large circular mic button with hold-to-talk gesture and pulse animation.
-struct MicButton: View {
-    
-    // MARK: - Properties
-    
-    let isRecording: Bool
-    let isProcessing: Bool
-    let onPress: () async -> Void
-    let onRelease: () async -> Void
-    
-    // MARK: - State
-    
-    @State private var scale: CGFloat = 1.0
-    @State private var pulseScale: CGFloat = 1.0
-    
-    // MARK: - Body
-    
-    var body: some View {
-        ZStack {
-            // Pulse ring (only when recording)
-            if isRecording {
-                Circle()
-                    .stroke(AppColors.recording.opacity(0.3), lineWidth: 4)
-                    .frame(
-                        width: Sizing.micButtonLarge + 40,
-                        height: Sizing.micButtonLarge + 40
-                    )
-                    .scaleEffect(pulseScale)
-                    .opacity(2 - pulseScale)
-                    .animation(
-                        .easeInOut(duration: 1.5).repeatForever(autoreverses: false),
-                        value: pulseScale
-                    )
-            }
-            
-            // Main button
-            Circle()
-                .fill(isRecording ? AppColors.recording : AppColors.appAccent)
-                .frame(
-                    width: Sizing.micButtonLarge,
-                    height: Sizing.micButtonLarge
-                )
-                .scaleEffect(scale)
-                .shadow(color: .black.opacity(0.3), radius: 20, y: 10)
-                .overlay {
-                    Image(systemName: iconName)
-                        .font(.system(size: 80))
-                        .foregroundStyle(.white)
-                }
-                .gesture(
-                    DragGesture(minimumDistance: 0)
-                        .onChanged { _ in
-                            if !isRecording && !isProcessing {
-                                Task {
-                                    await onPress()
-                                }
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                                    scale = 0.92
-                                }
-                            }
-                        }
-                        .onEnded { _ in
-                            if isRecording {
-                                Task {
-                                    await onRelease()
-                                }
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                                    scale = 1.0
-                                }
-                            }
-                        }
-                )
-        }
-        .onChange(of: isRecording) { _, newValue in
-            pulseScale = newValue ? 1.3 : 1.0
-        }
-    }
-    
-    private var iconName: String {
-        if isProcessing { return "ellipsis.circle.fill" }
-        return isRecording ? "stop.fill" : "mic.fill"
     }
 }
 
