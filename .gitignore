@@ -1,0 +1,86 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+
+# Xcode
+build/
+DerivedData/
+*.xcuserstate
+*.xcodeproj/*
+!*.xcodeproj/project.pbxproj
+!*.xcodeproj/xcshareddata/
+*.xcworkspace/*
+!*.xcworkspace/contents.xcworkspacedata
+!*.xcworkspace/xcshareddata/
+*.moved-aside
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+xcuserdata/
+*.xccheckout
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Packages/
+Package.resolved
+*.xcodeproj
+
+# Fastlane / CI
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
+
+# CocoaPods (if used later)
+Pods/
+*.podspec.json
+
+# Carthage
+Carthage/Build/
+Carthage/Checkouts/
+
+# Secrets
+*.p12
+*.cer
+*.mobileprovision
+*.p8
+*.p12
+
+# Whisper models (downloaded on first launch)
+Models/
+*.bin
+*.gguf
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*~
+
+# IDEs
+.vscode/
+.idea/
+*.iml
+
+# Logs
+*.log
+
+# Test outputs
+test_output/
+Testing/
+
+# Generated docs
+docs/build/
