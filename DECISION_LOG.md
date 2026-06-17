@@ -223,3 +223,44 @@ voiceflow/
 ---
 
 *Last updated: 2026-06-17*
+
+---
+
+## Decision 013: Multi-Model Architecture (Whisper + Parakeet + Breeze + GigaAM + Cohere + Moonshine)
+
+**Date:** 2026-06-17
+**Status:** ✅ Decided (after seeing Handy's model selection UI)
+
+**Trigger:** User screenshot of Handy's "Modelle" page showed 5 different models (Parakeet V3, Cohere, Breeze ASR, Whisper Turbo, GigaAM v3). User asked: "Lass uns dann auch einfach ein paar verschiedene Open Source Modelle anbinden."
+
+**Decision:** VoiceFlow will support multiple transcription backends via a pluggable `TranscriptionBackend` protocol. Inspired by Handy's approach.
+
+**Models to support (phased):**
+- Phase 1: Whisper (Tiny/Base/Small/Large-Turbo) via WhisperKit
+- Phase 1.5: Parakeet TDT v3 via FluidAudio
+- Phase 2: Breeze ASR 25, GigaAM v3, Cohere Transcribe
+- Phase 3: Moonshine (tiny model for low-power devices)
+
+**Rationale:**
+- ✅ Each model has different strengths (language, accuracy, speed, size)
+- ✅ User can pick the best model for their use case
+- ✅ Parakeet TDT v3 is fastest (real-time on iPhone 15 Pro)
+- ✅ GigaAM v3 best for Russian
+- ✅ Breeze ASR 25 best for Mandarin
+- ✅ Cohere Transcribe has lowest WER (5.42%, beats Whisper Large v3)
+- ✅ Whisper is the safe default (99+ languages)
+
+**iOS Libraries:**
+- WhisperKit (Argmax) — MIT, Swift-native, ANE
+- FluidAudio (FluidInference) — MIT, Swift, CoreML
+- CoreML (Apple native)
+- ONNX Runtime (for GigaAM v3)
+
+**Inspired by:** Handy v0.8.3 Models screen.
+
+**Updated docs:**
+- docs/MODEL_REGISTRY.md (new) — Model matrix + pluggable architecture
+- docs/WIREFRAMES.md — Added Screen 6: Models (Handy-style)
+- docs/ARCHITECTURE.md — Added "5. Model Backends" section
+- docs/ROADMAP.md — Updated with multi-model timeline
+

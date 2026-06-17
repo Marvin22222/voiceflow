@@ -169,6 +169,31 @@ Code shared between main app and keyboard extension.
 
 ---
 
+
+
+### 5. Model Backends (Pluggable Architecture)
+
+VoiceFlow is **model-agnostic**. We support multiple transcription engines via a unified `TranscriptionBackend` protocol. See [docs/MODEL_REGISTRY.md](MODEL_REGISTRY.md) for the full model matrix.
+
+**Supported backends:**
+- **Whisper** (OpenAI) — via [WhisperKit](https://github.com/argmaxinc/WhisperKit) (Phase 1)
+- **Parakeet TDT v3** (NVIDIA) — via [FluidAudio](https://github.com/FluidInference/FluidAudio) (Phase 1.5)
+- **Breeze ASR 25** (MediaTek) — CoreML port (Phase 2)
+- **GigaAM v3** (SberDevices) — ONNX (Phase 2)
+- **Cohere Transcribe** — Custom (Phase 2)
+- **Moonshine** (Useful Sensors) — WhisperKit-compatible (Phase 3)
+
+**Adding a new model** is a 3-step process:
+1. Create a Swift class conforming to `TranscriptionBackend`
+2. Add it to `ModelRegistry`
+3. Add UI metadata (size, accuracy, speed, languages)
+
+**Why multiple models?**
+- Different languages have different best-fit models (GigaAM > Whisper for Russian)
+- Some users want max accuracy, others want max speed
+- iPhone 15 Pro+ can handle large models; older devices need tiny models
+- Parakeet is faster but English/EU-only; Whisper is slower but multilingual
+
 ## 🔄 Data Flow
 
 ### Standard Flow: Recording via App

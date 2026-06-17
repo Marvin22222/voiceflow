@@ -413,3 +413,105 @@ enum AppFonts {
 ---
 
 *Last updated: 2026-06-17*
+
+---
+
+## 6️⃣ Models Screen (Handy-Style)
+
+Download, manage, and switch between multiple transcription models.
+
+```
+┌──────────────────────────────────────┐
+│  ← Back      Models                  │
+│──────────────────────────────────────│
+│                                      │
+│  ⓘ  Choose a model or download       │  ← Instruction text
+│     additional ones. Different       │
+│     models offer different           │
+│     accuracy & speed.                │
+│                                      │
+│  DOWNLOADED                          │  ← Section header
+│  ┌────────────────────────────────┐  │
+│  │ ⚡ Whisper Base          ✓    │  │  ← Active model (checkmark)
+│  │   74 MB · Multilingual (99+)   │  │
+│  │   Acc ████░  Speed █████       │  │  ← Visual scores
+│  │   [Delete]                     │  │
+│  ├────────────────────────────────┤  │
+│  │ ⚡ Parakeet TDT v3            │  │  ← Downloaded, not active
+│  │   500 MB · 25 EU languages     │  │
+│  │   Acc ████░  Speed █████       │  │
+│  │   [Activate]  [Delete]         │  │
+│  └────────────────────────────────┘  │
+│                                      │
+│  AVAILABLE FOR DOWNLOAD              │  ← Section header
+│  ┌────────────────────────────────┐  │
+│  │ 🌟 Cohere Transcribe           │  │  ← Available model
+│  │   1.7 GB · 100+ languages      │  │
+│  │   Best accuracy, slower        │  │
+│  │   Acc █████  Speed ██░░░       │  │
+│  │   [Download ↓ 1.7 GB]          │  │  ← Download button
+│  ├────────────────────────────────┤  │
+│  │ 🀄 Breeze ASR 25               │  │
+│  │   1.0 GB · Mandarin + EN       │  │
+│  │   Code-switching support       │  │
+│  │   Acc ████░  Speed ████░       │  │
+│  │   [Download ↓ 1.0 GB]          │  │
+│  ├────────────────────────────────┤  │
+│  │ 🇷🇺 GigaAM v3                  │  │
+│  │   151 MB · Russian only        │  │
+│  │   Acc ████░  Speed █████       │  │
+│  │   [Download ↓ 151 MB]          │  │
+│  ├────────────────────────────────┤  │
+│  │ 🌙 Moonshine                   │  │
+│  │   50 MB · English, Spanish     │  │
+│  │   Tiny & ultra-fast            │  │
+│  │   [Download ↓ 50 MB]           │  │
+│  └────────────────────────────────┘  │
+│                                      │
+│  STORAGE USED                        │
+│  74 MB / 5 GB available              │  ← Storage indicator
+│  [Manage Storage]                    │
+│                                      │
+└──────────────────────────────────────┘
+```
+
+**States:**
+
+#### Model Downloading
+```
+│  │ ⚡ Parakeet TDT v3            │  │
+│  │   500 MB · 25 EU languages     │  │
+│  │   Acc ████░  Speed █████       │  │
+│  │   ╭───────────────────╮       │  │  ← Progress bar
+│  │   │ ████████░░░░ 65%  │       │  │     (animated)
+│  │   ╰───────────────────╯       │  │
+│  │   175 MB / 500 MB · 2m left   │  │  ← Download stats
+│  │   [Pause]  [Cancel]            │  │
+```
+
+#### Model Ready (Just Downloaded)
+```
+│  │ ⚡ Parakeet TDT v3     [NEW]  │  │  ← "NEW" badge
+│  │   500 MB · 25 EU languages     │  │
+│  │   ✓ Download complete          │  │
+│  │   [Activate]  [Delete]         │  │
+```
+
+#### All Models Downloaded View
+```
+│  DOWNLOADED                          │
+│  ┌────────────────────────────────┐  │
+│  │ ⚡ Whisper Base          ✓    │  │  ← Active
+│  ├────────────────────────────────┤  │
+│  │ ⚡ Parakeet TDT v3            │  │
+│  ├────────────────────────────────┤  │
+│  │ 🇷🇺 GigaAM v3                 │  │
+│  └────────────────────────────────┘  │
+│                                      │
+│  AVAILABLE FOR DOWNLOAD              │
+│  All models downloaded! 🎉           │  ← Empty state
+│  [Check for Updates]                 │
+```
+
+---
+

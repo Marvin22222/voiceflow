@@ -26,14 +26,14 @@ Ship a **free, open source, on-device voice-to-text app for iPhone** that:
 
 ---
 
-## Phase 1: MVP — Core App (4-6 weeks)
+## Phase 1: MVP — Core App + Whisper (4-6 weeks)
 
-**Goal:** Functional voice-to-text app with basic UI.
+**Goal:** Functional voice-to-text app with Whisper support and basic UI.
 
 ### Week 1: Setup
 - [ ] Xcode project structure (Main App + Keyboard Ext. + Shared)
 - [ ] App Group configuration
-- [ ] SwiftUI app skeleton with TabView (Home, History, Settings)
+- [ ] SwiftUI app skeleton with TabView (Home, Models, History, Settings)
 - [ ] GitHub Actions CI (build + lint + test)
 
 ### Week 2: Audio + WhisperKit
@@ -54,19 +54,75 @@ Ship a **free, open source, on-device voice-to-text app for iPhone** that:
 - [ ] Copy / Share actions
 - [ ] Save transcription to SwiftData
 
-### Week 5: Settings + Polish
+### Week 5: Models Screen (Handy-style)
+- [ ] Models screen with downloaded + available models
+- [ ] Model download UI (progress, cancel, pause)
+- [ ] Model delete / free up storage
+- [ ] Activate model (set as default)
+- [ ] Visual accuracy/speed indicators
+- [ ] Storage usage display
+
+### Week 6: Settings + Onboarding + Beta
 - [ ] Settings screen (model, language, theme, trigger options)
 - [ ] Theme switching (dark/light/auto)
 - [ ] Accent color picker
-- [ ] Error handling + empty states
-
-### Week 6: Onboarding + Beta
-- [ ] 5-screen onboarding flow (Welcome → Model → Permissions → Keyboard → Done)
-- [ ] First-launch experience
+- [ ] 5-screen onboarding flow
 - [ ] TestFlight upload
 - [ ] Internal testing
 
-**Deliverable:** MVP that can record, transcribe, and display results.
+**Deliverable:** MVP with Whisper + Models management UI.
+
+---
+
+
+
+---
+
+## Phase 1.5: Multi-Model Foundation (2-3 weeks)
+
+**Goal:** Add Parakeet as second backend, refactor for pluggable architecture.
+
+### Week 7-8: Pluggable Backend Architecture
+- [ ] Define `TranscriptionBackend` protocol
+- [ ] Refactor WhisperKit into `WhisperBackend` conforming to protocol
+- [ ] Create `ModelRegistry` (catalog of all models)
+- [ ] Model download manager (HuggingFace, GitHub, direct URLs)
+- [ ] Update Models screen to show pluggable backends
+
+### Week 9: Add Parakeet TDT v3
+- [ ] Add [FluidAudio](https://github.com/FluidInference/FluidAudio) Swift Package
+- [ ] Implement `ParakeetBackend` (NVIDIA Parakeet TDT 0.6B v3)
+- [ ] Add to Models screen as download option
+- [ ] Test on iPhone 15 Pro + older devices
+- [ ] Document performance benchmarks
+
+**Deliverable:** Pluggable architecture + 2 working backends (Whisper + Parakeet).
+
+---
+
+## Phase 2: More Models + Auto-Detection (4-6 weeks)
+
+**Goal:** Add Breeze ASR, GigaAM, Cohere Transcribe. Language-aware auto-switching.
+
+### Week 10-11: Breeze ASR 25
+- [ ] Port [Breeze-ASR-25_coreml](https://huggingface.co/aoiandroid/Breeze-ASR-25_coreml) to iOS
+- [ ] Implement `BreezeASRBackend` (Mandarin + English, code-switching)
+- [ ] Test on iPhone 15 Pro
+- [ ] Add to Models screen
+
+### Week 12-13: GigaAM v3 + Cohere Transcribe
+- [ ] Port GigaAM v3 to ONNX Runtime for iOS
+- [ ] Implement `GigaAMBackend` (Russian)
+- [ ] Integrate Cohere Transcribe (highest accuracy)
+- [ ] Add both to Models screen
+
+### Week 14-15: Language Auto-Detection
+- [ ] Implement language detection (first 5 seconds of audio)
+- [ ] Auto-select best model for detected language
+- [ ] User can pin models to specific languages
+- [ ] Settings → "Auto-select model" toggle
+
+**Deliverable:** 5 backends (Whisper, Parakeet, Breeze, GigaAM, Cohere) + auto-detection.
 
 ---
 
