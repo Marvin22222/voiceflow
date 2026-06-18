@@ -1,0 +1,17 @@
+# SwiftFormat configuration
+# https://github.com/nicklockwood/SwiftFormat
+
+--indent 4
+--tabwidth 4
+--linebreaks lf
+--maxwidth 120
+--wraparguments before-first
+--wrapcollections before-first
+--closingparen balanced
+--operatorfunc spaced
+--emptybraces no-space
+--ranges no-space
+--trimwhitespace always
+--insertlines enabled
+--removelines enabled
+--comments indent
