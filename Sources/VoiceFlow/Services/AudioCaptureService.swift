@@ -76,17 +76,10 @@ final class AudioCaptureService {
     /// Range: typically -160 (silence) to 0 (max).
     var currentLevel: Float = -160
     
-    /// Duration of current recording session, in seconds.
-    var recordingDuration: TimeInterval {
-        guard let startTime = recordingStartTime else { return 0 }
-        return Date().timeIntervalSince(startTime)
-    }
-    
     // MARK: - Private Properties
     
     private let audioEngine = AVAudioEngine()
     private let audioBufferSubject = PassthroughSubject<AVAudioPCMBuffer, Never>()
-    private var recordingStartTime: Date?
     private var levelTimer: Timer?
     
     // MARK: - Initialization
@@ -137,7 +130,6 @@ final class AudioCaptureService {
         }
         
         // 5. Update state
-        recordingStartTime = Date()
         isRecording = true
         startLevelMonitoring()
     }
@@ -152,7 +144,6 @@ final class AudioCaptureService {
         
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         
-        recordingStartTime = nil
         isRecording = false
         currentLevel = -160
     }
