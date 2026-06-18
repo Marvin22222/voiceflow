@@ -45,7 +45,7 @@ struct RecordingView: View {
             VStack(spacing: Spacing.xl) {
                 recordingIndicator
                 Spacer()
-                waveformPlaceholder
+                waveform
                 Spacer()
                 controlsRow
                 durationCounter
@@ -82,18 +82,13 @@ struct RecordingView: View {
         }
     }
     
-    /// Static placeholder for the live waveform: 30 bars at neutral height.
-    /// Real `WaveformView` with RMS-driven bars will replace this in #20b.
-    private var waveformPlaceholder: some View {
-        HStack(alignment: .center, spacing: 3) {
-            ForEach(0..<30, id: \.self) { _ in
-                RoundedRectangle(cornerRadius: 2)
-                    .fill(AppColors.appAccent)
-                    .frame(width: 4, height: 24)
-            }
-        }
-        .frame(height: 60)
-        .accessibilityLabel(Text("Audio waveform"))
+    /// Live waveform during recording. RMS-driven bars animated at 60fps via TimelineView.
+    /// Freezes on stop (VM stops appending) and under Reduce Motion (View-side snapshot).
+    private var waveform: some View {
+        WaveformView(
+            amplitudes: viewModel.audioLevels,
+            isActive: viewModel.isRecording
+        )
     }
     
     /// Stop (primary, red) and Cancel (secondary, surface) buttons.
