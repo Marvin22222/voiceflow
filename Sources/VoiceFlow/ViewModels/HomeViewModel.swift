@@ -44,6 +44,20 @@ final class HomeViewModel: ObservableObject {
     /// Live audio level (0.0 to 1.0, normalized from dB).
     @Published var audioLevel: Float = 0
     
+    /// Rolling buffer of normalized RMS values for the live waveform.
+    /// Stores up to ``maxAudioLevels`` entries (oldest first).
+    /// Updated only while ``isRecording`` is `true`; freezes at last value otherwise
+    /// so the View can render the final state until the next session starts.
+    @Published var audioLevels: [Float] = []
+    
+    // MARK: - Audio Level Constants
+    
+    /// Maximum number of bars rendered in the live waveform (Issue #20 spec).
+    private static let maxAudioLevels = 30
+    
+    /// EMA smoothing factor for RMS amplitude. Lower = smoother, higher = more responsive.
+    private static let rmsSmoothingAlpha: Float = 0.3
+    
     // MARK: - Dependencies
     
     private let audioService: AudioCaptureService
@@ -54,6 +68,9 @@ final class HomeViewModel: ObservableObject {
     
     private var collectedAudio: [AVAudioPCMBuffer] = []
     private var bufferSubscription: AnyCancellable?
+    
+    /// Smoothed RMS amplitude (EMA) carried across buffers. Reset in ``resetAudioLevels``.
+    private var smoothedRMS: Float = 0
     
     /// Start time of the current recording session (single source of truth for duration UI).
     /// `nil` when not recording. Read by ``RecordingView`` via TimelineView to drive MM:SS counter.
@@ -170,6 +187,9 @@ final class HomeViewModel: ObservableObject {
     }
     
     private func subscribeToAudioBuffers() {
+        // Defensive reset: clear any stale data from the previous session
+        // before the new Combine subscription starts emitting.
+        resetAudioLevels()
         bufferSubscription = audioService.audioBufferPublisher
             .receive(on: DispatchQueue.main)
             .sink { [weak self] buffer in
@@ -177,9 +197,55 @@ final class HomeViewModel: ObservableObject {
             }
     }
     
+    @MainActor
     private func handleAudioBuffer(_ buffer: AVAudioPCMBuffer) {
+        // VM stops updates when not recording. The audioLevels array freezes at
+        // its last value, which the View continues to render (frozen-on-stop).
+        guard isRecording else { return }
+        
         collectedAudio.append(buffer)
-        // TODO: Update audioLevel based on buffer amplitude
+        let rawRMS = Self.computeRMS(buffer)
+        // EMA smoothing on the current value (not the whole array).
+        smoothedRMS = Self.rmsSmoothingAlpha * rawRMS
+            + (1 - Self.rmsSmoothingAlpha) * smoothedRMS
+        let normalized = Self.normalizeDB(smoothedRMS)
+        
+        audioLevels.append(normalized)
+        if audioLevels.count > Self.maxAudioLevels {
+            audioLevels.removeFirst(audioLevels.count - Self.maxAudioLevels)
+        }
+        audioLevel = normalized
+    }
+    
+    /// Clears the rolling audio levels buffer. Called from ``subscribeToAudioBuffers``
+    /// at session start; also exposed publicly for manual reset (e.g., after error paths).
+    func resetAudioLevels() {
+        audioLevels = []
+        smoothedRMS = 0
+    }
+    
+    /// Computes RMS (Root Mean Square) amplitude from a 32-bit float PCM buffer.
+    /// Returns 0 for empty or non-float buffers.
+    private static func computeRMS(_ buffer: AVAudioPCMBuffer) -> Float {
+        guard let channelData = buffer.floatChannelData?[0] else { return 0 }
+        let frameLength = Int(buffer.frameLength)
+        guard frameLength > 0 else { return 0 }
+        var sumOfSquares: Float = 0
+        for i in 0..<frameLength {
+            let sample = channelData[i]
+            sumOfSquares += sample * sample
+        }
+        return (sumOfSquares / Float(frameLength)).squareRoot()
+    }
+    
+    /// Maps RMS amplitude to 0–1 with -50 dB floor and 0 dB ceiling (linear interp).
+    /// -50 dB floor matches audio-meter standards for speech; below-floor = 0, above-ceiling = 1.
+    private static func normalizeDB(_ rms: Float) -> Float {
+        // Clamp away from log(0) — smallest representable Float that still maps to floor.
+        let safeRMS = max(rms, 1e-7)
+        let db = 20 * log10(safeRMS)
+        let clampedDB = max(-50.0, min(0.0, db))
+        return Float((clampedDB + 50.0) / 50.0)
     }
     
     private func transcribeCollectedAudio() async {
