@@ -49,7 +49,18 @@ final class HomeViewModel: ObservableObject {
     /// Updated only while ``isRecording`` is `true`; freezes at last value otherwise
     /// so the View can render the final state until the next session starts.
     @Published var audioLevels: [Float] = []
-    
+
+    /// Live partial transcription text yielded by the streaming backend during
+    /// the current recording session (Issue #20c).
+    ///
+    /// Empty when no streaming session is active. Appended as the streaming
+    /// backend yields new increments. Reset by ``resetLivePartialText``.
+    @Published var livePartialText: String = ""
+
+    /// Indicates whether a streaming transcription session is currently active.
+    /// Useful for the UI to show a "Live" badge or to gate the partial-text view.
+    @Published var isStreaming: Bool = false
+
     // MARK: - Audio Level Constants
     
     /// Maximum number of bars rendered in the live waveform (Issue #20 spec).
@@ -65,10 +76,20 @@ final class HomeViewModel: ObservableObject {
     private let modelManager: ModelManager
     
     // MARK: - Private State
-    
+
     private var collectedAudio: [AVAudioPCMBuffer] = []
     private var bufferSubscription: AnyCancellable?
-    
+
+    /// Long-running streaming transcription task (Issue #20c).
+    /// Created in ``startStreamingIfAvailable`` when a streaming-capable
+    /// backend is loaded and a session starts. Cancelled in ``stopRecording``
+    /// and ``cancelRecording``.
+    private var streamingTask: Task<Void, Never>?
+
+    /// The streaming backend instance selected for this session. Nil when
+    /// no streaming backend is available or when streaming is disabled.
+    private var streamingBackend: (any TranscriptionBackend)?
+
     /// Smoothed RMS amplitude (EMA) carried across buffers. Reset in ``resetAudioLevels``.
     private var smoothedRMS: Float = 0
     
@@ -100,14 +121,16 @@ final class HomeViewModel: ObservableObject {
     /// Starts recording. Called by hold-to-talk.
     func startRecording() async {
         guard !isRecording else { return }
-        
+
         errorMessage = nil
         collectedAudio = []
+        resetLivePartialText()
         recordingStartTime = Date()
-        
+
         do {
             try await audioService.start()
             subscribeToAudioBuffers()
+            await startStreamingIfAvailable()
             isRecording = true
             AppGroup.setRecordingStatus(.recording)
         } catch {
@@ -119,18 +142,19 @@ final class HomeViewModel: ObservableObject {
     /// Stops recording and starts transcription. Called on release.
     func stopRecording() async {
         guard isRecording else { return }
-        
+
         await audioService.stop()
         bufferSubscription?.cancel()
         bufferSubscription = nil
         isRecording = false
         recordingStartTime = nil
-        
+        cancelStreamingTask()
+
         guard !collectedAudio.isEmpty else {
             AppGroup.setRecordingStatus(.idle)
             return
         }
-        
+
         await transcribeCollectedAudio()
     }
     
@@ -138,20 +162,22 @@ final class HomeViewModel: ObservableObject {
     /// Called from the Cancel button in ``RecordingView``.
     func cancelRecording() async {
         guard isRecording else { return }
-        
+
         // Tactile confirmation that the recording was discarded.
         // Apple recommends preparing the generator up front to minimize
         // latency on the first notification.
         let cancelHaptic = UINotificationFeedbackGenerator()
         cancelHaptic.prepare()
         cancelHaptic.notificationOccurred(.warning)
-        
+
         await audioService.stop()
         bufferSubscription?.cancel()
         bufferSubscription = nil
+        cancelStreamingTask()
         collectedAudio = []
         isRecording = false
         recordingStartTime = nil
+        resetLivePartialText()
         errorMessage = nil
         AppGroup.setRecordingStatus(.idle)
     }
@@ -222,6 +248,98 @@ final class HomeViewModel: ObservableObject {
     func resetAudioLevels() {
         audioLevels = []
         smoothedRMS = 0
+    }
+
+    /// Resets the live partial-transcription text (Issue #20c).
+    /// Called from session start (via ``startRecording``) and on cancel.
+    func resetLivePartialText() {
+        livePartialText = ""
+        isStreaming = false
+    }
+
+    /// Selects a streaming-capable backend for the current session and starts
+    /// the long-running streaming task that consumes the audio publisher.
+    ///
+    /// No-op if no streaming-capable backend is loaded or if the active model
+    /// doesn't support streaming. The selection respects the user's
+    /// ``StreamingPreference`` via ``ModelRegistry/selectStreamingBackend(for:among:userPreference:)``.
+    private func startStreamingIfAvailable() async {
+        // Tear down any leftover task before starting a new one.
+        cancelStreamingTask()
+
+        guard activeModel != nil else { return }
+
+        // Read the user-configured streaming preference from UserDefaults
+        // (matches `@AppStorage` key in `SettingsView`).
+        let preference = StreamingPreference.storedValue()
+
+        // Candidate backends: the active backend if it supports streaming,
+        // otherwise an empty list (no other backends are loaded in MVP).
+        var candidates: [any TranscriptionBackend] = []
+        if let backend = transcriptionService.activeBackend, backend.supportsStreaming {
+            candidates.append(backend)
+        }
+
+        // For the MVP, hint with `.auto` — backend auto-detects language on
+        // each chunk. A future PR will pass the user's preferred language here.
+        guard let selected = ModelRegistry.selectStreamingBackend(
+            for: .auto,
+            among: candidates,
+            userPreference: preference
+        ) else {
+            // No streaming backend available — silently fall back to batch
+            // transcription after stop. No live partial text is shown.
+            return
+        }
+
+        streamingBackend = selected
+
+        // Build the audio stream from the existing Combine publisher.
+        let audioStream = AudioCapturePublisherStream.makeStream(
+            from: audioService.audioBufferPublisher
+        )
+
+        // Start the streaming task. It runs for the lifetime of the recording
+        // session and forwards partial chunks into `livePartialText`.
+        isStreaming = true
+        streamingTask = Task { [weak self] in
+            guard let self else { return }
+            for await chunk in selected.streamTranscribe(audioStream: audioStream) {
+                if Task.isCancelled { break }
+                await self.appendLivePartialChunk(chunk)
+                if chunk.isFinal { break }
+            }
+            await self.markStreamingFinished()
+        }
+    }
+
+    /// Appends a streaming ``TranscriptionChunk`` to ``livePartialText``.
+    ///
+    /// Concatenates with a leading space when needed. No-op for empty chunks.
+    private func appendLivePartialChunk(_ chunk: TranscriptionChunk) {
+        let text = chunk.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+
+        if livePartialText.isEmpty {
+            livePartialText = text
+        } else {
+            livePartialText += " " + text
+        }
+    }
+
+    /// Marks streaming as finished and clears internal backend handle.
+    private func markStreamingFinished() {
+        isStreaming = false
+        streamingBackend = nil
+    }
+
+    /// Cancels and discards the active streaming task. Safe to call when no
+    /// task is active.
+    private func cancelStreamingTask() {
+        streamingTask?.cancel()
+        streamingTask = nil
+        streamingBackend = nil
+        isStreaming = false
     }
     
     /// Computes RMS (Root Mean Square) amplitude from a 32-bit float PCM buffer.
