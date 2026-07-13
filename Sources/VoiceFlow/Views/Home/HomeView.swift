@@ -21,7 +21,6 @@ struct HomeView: View {
     // MARK: - State
     
     @StateObject private var viewModel: HomeViewModel
-    // TODO(#21): Settings-Sheet hier einhängen (.sheet(isPresented: $showSettings))
     @State private var showSettings = false
     
     // MARK: - Initialization
@@ -76,6 +75,12 @@ struct HomeView: View {
             set: { _ in /* VM is source of truth; cover auto-dismisses when isRecording flips to false */ }
         )) {
             RecordingView(viewModel: viewModel)
+        }
+        .sheet(isPresented: $showSettings) {
+            SettingsView()
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(AppColors.backgroundDark)
         }
     }
     
