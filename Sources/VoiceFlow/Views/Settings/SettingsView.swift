@@ -37,6 +37,7 @@ struct SettingsView: View {
                 modelSection
                 languageSection
                 triggerSection
+                streamingSection
                 appearanceSection
                 advancedSection
                 aboutSection
@@ -139,6 +140,38 @@ struct SettingsView: View {
             ))
         }
     }
+
+    /// Streaming-mode picker (Issue #20c).
+    ///
+    /// Lets the user choose how the streaming backend is selected:
+    /// - **Auto**: best backend for the active language.
+    /// - **Multilingual (WhisperKit)**: always use WhisperKit for streaming.
+    /// - **Low-Latency (EN/EU)**: prefer Parakeet-EOU when available.
+    ///
+    /// Persisted via `@AppStorage` (UserDefaults) so the value survives
+    /// across launches and is readable by future extensions via the
+    /// App Group suite. See ``StreamingPreference`` for the enum.
+    private var streamingSection: some View {
+        Section {
+            Picker("Streaming Mode", selection: $streamingPreference) {
+                ForEach(StreamingPreference.allCases, id: \.self) { preference in
+                    Text(preference.displayName).tag(preference)
+                }
+            }
+        } header: {
+            Text("Streaming")
+        } footer: {
+            Text(streamingPreference.explanation)
+        }
+    }
+
+    /// Persisted streaming preference (Issue #20c).
+    ///
+    /// Stored in the standard `UserDefaults` (not the App Group suite)
+    /// because the main app is the only writer today. When the keyboard
+    /// extension starts reading this, we'll switch to `AppGroup.sharedDefaults`.
+    @AppStorage("voiceflow.streamingPreference")
+    private var streamingPreference: StreamingPreference = .auto
     
     private var aboutSection: some View {
         Section("About") {

@@ -3,7 +3,8 @@
 //  VoiceFlow
 //
 //  Full-screen recording UI shown while audio capture is active.
-//  Contains: pulsing indicator, waveform placeholder, MM:SS counter, and Stop/Cancel controls.
+//  Contains: pulsing indicator, live RMS waveform (Issue #20b),
+//  live partial transcription text (Issue #20c), MM:SS counter, and Stop/Cancel controls.
 //
 
 import SwiftUI
@@ -17,35 +18,43 @@ import VoiceFlowShared
 /// Reads `HomeViewModel.recordingStartTime` and uses `TimelineView(.periodic)` to drive
 /// the MM:SS counter at 1 Hz without managing a `Timer`.
 ///
-/// The waveform area is a static placeholder in this PR; the live `WaveformView` with
-/// RMS-driven bars will be added in a follow-up issue (#20b).
+/// ## Layers
+///
+/// 1. ``recordingIndicator`` — pulsing red dot + label (top).
+/// 2. ``waveform`` — live RMS-driven bars via ``WaveformView`` (Issue #20b).
+/// 3. ``livePartialTextView`` — running partial transcription via the
+///    streaming backend (Issue #20c). Hidden when no streaming backend is
+///    available; shows "Listening…" placeholder before the first chunk.
+/// 4. ``controlsRow`` — Stop (primary) + Cancel (secondary) buttons.
+/// 5. ``durationCounter`` — MM:SS counter (bottom).
 ///
 /// - Parameters:
 ///   - viewModel: The shared `HomeViewModel` that owns recording state and the audio service.
 struct RecordingView: View {
-    
+
     // MARK: - Properties
-    
+
     @ObservedObject var viewModel: HomeViewModel
-    
+
     // MARK: - Environment
-    
+
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    
+
     // MARK: - State
-    
+
     @State private var pulseOpacity: Double = 1.0
-    
+
     // MARK: - Body
-    
+
     var body: some View {
         ZStack {
             AppColors.backgroundDark.ignoresSafeArea()
-            
+
             VStack(spacing: Spacing.xl) {
                 recordingIndicator
                 Spacer()
                 waveform
+                livePartialTextView
                 Spacer()
                 controlsRow
                 durationCounter
@@ -89,6 +98,85 @@ struct RecordingView: View {
             amplitudes: viewModel.audioLevels,
             isActive: viewModel.isRecording
         )
+    }
+
+    /// Live partial transcription text (Issue #20c).
+    ///
+    /// Shown when streaming is active. Three states:
+    /// 1. **No streaming** — hidden (zero-height placeholder, animates out).
+    /// 2. **Streaming, no text yet** — faint "Listening…" placeholder, animates in.
+    /// 3. **Streaming, partial text** — the running text, scrollable to bottom,
+    ///    with a 300 ms fade-in on each new chunk.
+    ///
+    /// Smooth scroll-to-bottom: ScrollViewReader anchors to `bottomAnchor`
+    /// which we scroll to on each text change via `.onChange(of:)`.
+    @ViewBuilder
+    private var livePartialTextView: some View {
+        if viewModel.isStreaming {
+            ScrollViewReader { proxy in
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: Spacing.xs) {
+                        if viewModel.livePartialText.isEmpty {
+                            placeholderText
+                        } else {
+                            Text(viewModel.livePartialText)
+                                .font(.body)
+                                .foregroundStyle(.white)
+                                .multilineTextAlignment(.leading)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .accessibilityLabel(Text("Live transcription"))
+                        }
+                        // Anchor for scroll-to-bottom.
+                        Color.clear
+                            .frame(height: 1)
+                            .id(Self.bottomAnchor)
+                    }
+                    .padding(.horizontal, Spacing.md)
+                    .padding(.vertical, Spacing.sm)
+                }
+                .frame(maxHeight: 140)
+                .background(AppColors.surfaceDark.opacity(0.6))
+                .clipShape(RoundedRectangle(cornerRadius: Sizing.cornerRadius))
+                .transition(.opacity.combined(with: .move(edge: .top)))
+                .animation(
+                    reduceMotion ? nil : .easeInOut(duration: 0.3),
+                    value: viewModel.livePartialText.isEmpty
+                )
+                .onChange(of: viewModel.livePartialText) { _, _ in
+                    // Scroll to the bottom anchor whenever new text arrives.
+                    guard !reduceMotion else { return }
+                    withAnimation(.easeOut(duration: 0.25)) {
+                        proxy.scrollTo(Self.bottomAnchor, anchor: .bottom)
+                    }
+                }
+                .onAppear {
+                    // Initial scroll (in case text was already populated).
+                    proxy.scrollTo(Self.bottomAnchor, anchor: .bottom)
+                }
+            }
+        } else {
+            // Streaming not active — zero-height placeholder so the layout
+            // doesn't shift when streaming starts/stops.
+            Color.clear.frame(height: 0)
+        }
+    }
+
+    /// Anchor ID used by ``livePartialTextView`` for scroll-to-bottom.
+    private static let bottomAnchor = "livePartialText.bottom"
+
+    /// "Listening…" placeholder shown while streaming but no chunks yet.
+    private var placeholderText: some View {
+        HStack(spacing: Spacing.sm) {
+            ProgressView()
+                .progressViewStyle(.circular)
+                .controlSize(.small)
+                .tint(.secondary)
+            Text("Listening…")
+                .font(.body.italic())
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityLabel(Text("Listening for speech"))
     }
     
     /// Stop (primary, red) and Cancel (secondary, surface) buttons.

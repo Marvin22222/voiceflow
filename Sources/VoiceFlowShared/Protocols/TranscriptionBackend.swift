@@ -73,12 +73,55 @@ public protocol TranscriptionBackend: AnyObject, Sendable {
     func transcribe<S: Sequence>(
         _ audioBuffers: S
     ) async throws -> [TranscriptionResult] where S.Element == AVAudioPCMBuffer
+
+    // MARK: - Streaming (opt-in)
+
+    /// Whether this backend can stream partial transcriptions as audio arrives.
+    ///
+    /// Backends that support real-time or chunked streaming override this
+    /// to return `true`. Backends that are batch-only inherit the default
+    /// (`false`) and should be used via ``transcribe(_:)`` instead.
+    ///
+    /// Callers should always check this property before invoking
+    /// ``streamTranscribe(audioStream:)`` — the default implementation
+    /// drains the input stream and yields nothing, which is wasted work
+    /// for batch-only backends.
+    var supportsStreaming: Bool { get }
+
+    /// Whether this backend is a Parakeet-EOU (low-latency) implementation.
+    ///
+    /// Replaces the previous `id.contains("parakeet-eou")` string-match
+    /// (Marvis review note 3, 2026-06-18). Default is `false`; Parakeet-EOU
+    /// backends override to `true`.
+    ///
+    /// Used by ``ModelRegistry/selectStreamingBackend(for:among:userPreference:)``
+    /// to pick a low-latency backend when one is loaded.
+    var isParakeetEOU: Bool { get }
+
+    /// Streams partial transcription chunks as audio arrives.
+    ///
+    /// The returned stream yields text **increments** via
+    /// ``TranscriptionChunk`` as the backend finishes processing each
+    /// chunk of audio. Callers are responsible for concatenating the
+    /// increments to reconstruct the running transcript.
+    ///
+    /// The stream is finished when the input stream finishes (or the
+    /// consumer's task is cancelled). The default implementation drains
+    /// the input stream and yields no chunks — useful as a safe no-op for
+    /// batch-only backends. Override in streaming-capable backends.
+    ///
+    /// - Parameter audioStream: Continuous audio chunks at the backend's
+    ///   expected rate (typically 16 kHz mono Float32 for VoiceFlow).
+    /// - Returns: `AsyncStream<TranscriptionChunk>` of partial increments.
+    func streamTranscribe(
+        audioStream: AsyncStream<AudioChunk>
+    ) -> AsyncStream<TranscriptionChunk>
 }
 
 // MARK: - Default Implementations
 
 public extension TranscriptionBackend {
-    
+
     func transcribe<S: Sequence>(
         _ audioBuffers: S
     ) async throws -> [TranscriptionResult] where S.Element == AVAudioPCMBuffer {
@@ -88,6 +131,43 @@ public extension TranscriptionBackend {
             results.append(result)
         }
         return results
+    }
+
+    // MARK: Streaming defaults
+
+    /// Default: batch-only backends don't stream. Override to `true` in streaming backends.
+    var supportsStreaming: Bool { false }
+
+    /// Default: this is not a Parakeet-EOU backend. Override to `true` in Parakeet-EOU impls.
+    var isParakeetEOU: Bool { false }
+
+    /// Default streaming implementation.
+    ///
+    /// Drains the input stream (so the producer doesn't block) and yields
+    /// an empty output stream. Safe to call on batch-only backends — the
+    /// caller will get zero chunks and can fall back to batch
+    /// ``transcribe(_:)`` if needed.
+    ///
+    /// Marvis review note 2 (2026-06-18): uses `continuation.onTermination`
+    /// to cancel the drain task when the consumer cancels, preventing a
+    /// resource leak when callers don't check ``supportsStreaming``.
+    func streamTranscribe(
+        audioStream: AsyncStream<AudioChunk>
+    ) -> AsyncStream<TranscriptionChunk> {
+        AsyncStream { continuation in
+            // Drain the input stream to avoid producer backpressure.
+            let drainTask = Task.detached(priority: .background) {
+                for await _ in audioStream {
+                    // Discard — batch-only backends don't produce partials.
+                }
+                continuation.finish()
+            }
+            // If the consumer cancels the output stream, stop the drain task
+            // so the input stream is freed (no resource leak).
+            continuation.onTermination = { _ in
+                drainTask.cancel()
+            }
+        }
     }
 }
 
