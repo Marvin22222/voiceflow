@@ -121,6 +121,19 @@ struct HomeView: View {
         )) {
             RecordingView(viewModel: viewModel)
         }
+        // Issue #23: present polished Result screen as a sheet after
+        // transcription completes. The VM flips showResult=true on success;
+        // the sheet auto-dismisses when the user taps Back/Insert (which
+        // sets it back to false).
+        .sheet(isPresented: Binding(
+            get: { viewModel.showResult && !viewModel.transcribedText.isEmpty },
+            set: { presented in
+                if !presented { viewModel.showResult = false }
+            }
+        )) {
+            ResultView(viewModel: viewModel)
+                .presentationDetents([.large])
+        }
         .sheet(isPresented: $showSettings) {
             SettingsView()
                 .presentationDetents([.medium, .large])

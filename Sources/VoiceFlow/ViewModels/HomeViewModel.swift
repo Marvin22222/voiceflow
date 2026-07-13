@@ -8,6 +8,7 @@
 import AVFoundation
 import Combine
 import Foundation
+import SwiftData
 import SwiftUI
 import UIKit
 import VoiceFlowShared
@@ -60,6 +61,10 @@ final class HomeViewModel: ObservableObject {
     /// Indicates whether a streaming transcription session is currently active.
     /// Useful for the UI to show a "Live" badge or to gate the partial-text view.
     @Published var isStreaming: Bool = false
+
+    /// Issue #23 — whether to present the polished Result screen as a sheet.
+    /// Set to true by ``transcribeCollectedAudio`` after a successful result.
+    @Published var showResult: Bool = false
 
     /// Current microphone authorization status (Issue #22).
     /// Updated on ``onAppear`` and after ``requestMicrophonePermission``.
@@ -431,28 +436,46 @@ final class HomeViewModel: ObservableObject {
     
     private func transcribeCollectedAudio() async {
         guard !collectedAudio.isEmpty else { return }
-        
+
         isTranscribing = true
         AppGroup.setRecordingStatus(.processing)
         defer {
             isTranscribing = false
             AppGroup.setRecordingStatus(.idle)
         }
-        
+
         // Concatenate all buffers into one
         guard let combined = concatenateBuffers(collectedAudio) else {
             errorMessage = "Could not combine audio buffers"
             return
         }
-        
+
         do {
             let result = try await transcriptionService.transcribe(combined)
             lastResult = result
             transcribedText = result.text
             AppGroup.setPendingText(result.text)
+            // Issue #23: surface the result via the published `showResult` flag
+            // so ``HomeView`` can present the polished Result screen.
+            showResult = true
         } catch {
             errorMessage = "Transcription failed: \(error.localizedDescription)"
             AppGroup.setRecordingStatus(.error)
+        }
+    }
+
+    /// Persist the last transcription result to SwiftData history.
+    /// Called from ``ResultView`` when the user dismisses (taps "Done").
+    ///
+    /// Safe to call when ``lastResult`` is nil — it just no-ops.
+    func saveToHistory(modelContext: ModelContext) {
+        guard let result = lastResult else { return }
+        let record = TranscriptionRecord(from: result)
+        modelContext.insert(record)
+        do {
+            try modelContext.save()
+        } catch {
+            errorMessage = "Could not save to history: \(error.localizedDescription)"
         }
     }
     
