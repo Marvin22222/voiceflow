@@ -87,7 +87,6 @@ enum AppTab: Hashable {
     case home
     case models
     case history
-    case settings
 }
 
 // MARK: - MainTabView
@@ -109,7 +108,11 @@ struct MainTabView: View {
                 }
                 .tag(AppTab.home)
             
-            ModelsView()
+            NavigationStack {
+                    ModelsView()
+                        .navigationTitle("Models")
+                        .navigationBarTitleDisplayMode(.inline)
+                }
                 .tabItem {
                     Label("Models", systemImage: "square.stack.3d.up.fill")
                 }
@@ -120,12 +123,6 @@ struct MainTabView: View {
                     Label("History", systemImage: "clock.arrow.circlepath")
                 }
                 .tag(AppTab.history)
-            
-            SettingsView()
-                .tabItem {
-                    Label("Settings", systemImage: "gearshape.fill")
-                }
-                .tag(AppTab.settings)
         }
         .tint(.appAccent)
     }
