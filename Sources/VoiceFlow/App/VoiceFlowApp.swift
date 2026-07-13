@@ -49,9 +49,44 @@ struct VoiceFlowApp: App {
                 .environment(transcriptionService)
                 .environment(modelManager)
                 .preferredColorScheme(.dark)  // Dark mode by default
+                // Issue #27: handle voiceflow:// URL scheme deep-links
+                // from the keyboard extension.
+                .onOpenURL { url in
+                    handleDeepLink(url)
+                }
         }
         .modelContainer(modelContainer)
     }
+    
+    /// Handles inbound URL scheme requests.
+    ///
+    /// Supported paths:
+    /// - `voiceflow://record` — start a new recording session
+    ///   (used by the keyboard's mic button)
+    /// - `voiceflow://settings` — open the Settings sheet (future use)
+    private func handleDeepLink(_ url: URL) {
+        guard url.scheme == "voiceflow" else { return }
+        switch url.host {
+        case "record":
+            // NotificationCenter bridges to HomeViewModel since the VM
+            // is created inside HomeView's @StateObject. The observation
+            // is set up in HomeView.onAppear.
+            NotificationCenter.default.post(
+                name: .voiceflowStartRecording,
+                object: nil
+            )
+        default:
+            break
+        }
+    }
+}
+
+// MARK: - Notification Names
+
+public extension Notification.Name {
+    /// Posted when the app receives a `voiceflow://record` deep-link.
+    /// ``HomeView`` listens for this and calls ``HomeViewModel/startRecording()``.
+    static let voiceflowStartRecording = Notification.Name("de.marvinschwab.voiceflow.startRecording")
 }
 
 // MARK: - RootView

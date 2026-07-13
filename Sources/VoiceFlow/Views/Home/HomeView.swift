@@ -90,6 +90,11 @@ struct HomeView: View {
         .task {
             await viewModel.onAppear()
         }
+        // Issue #27: respond to `voiceflow://record` deep-links from the
+        // keyboard extension by triggering a recording session.
+        .onReceive(NotificationCenter.default.publisher(for: .voiceflowStartRecording)) { _ in
+            Task { await viewModel.startRecording() }
+        }
         .alert(
             "Error",
             isPresented: .init(
