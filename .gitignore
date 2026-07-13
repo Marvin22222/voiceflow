@@ -60,7 +60,9 @@ Carthage/Checkouts/
 *.p12
 
 # Whisper models (downloaded on first launch)
-Models/
+# Only ignore the top-level Models/ directory used as a download cache;
+# do NOT ignore nested source directories like Sources/VoiceFlow/Views/Models/
+/Models/
 *.bin
 *.gguf
 
