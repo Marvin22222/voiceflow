@@ -9,6 +9,7 @@ import AVFoundation
 import Combine
 import Foundation
 import SwiftUI
+import UIKit
 import VoiceFlowShared
 
 // MARK: - HomeViewModel
@@ -53,7 +54,10 @@ final class HomeViewModel: ObservableObject {
     
     private var collectedAudio: [AVAudioPCMBuffer] = []
     private var bufferSubscription: AnyCancellable?
-    private var recordingStartTime: Date?
+    
+    /// Start time of the current recording session (single source of truth for duration UI).
+    /// `nil` when not recording. Read by ``RecordingView`` via TimelineView to drive MM:SS counter.
+    @Published var recordingStartTime: Date?
     
     // MARK: - Initialization
     
@@ -103,6 +107,7 @@ final class HomeViewModel: ObservableObject {
         bufferSubscription?.cancel()
         bufferSubscription = nil
         isRecording = false
+        recordingStartTime = nil
         
         guard !collectedAudio.isEmpty else {
             AppGroup.setRecordingStatus(.idle)
@@ -110,6 +115,28 @@ final class HomeViewModel: ObservableObject {
         }
         
         await transcribeCollectedAudio()
+    }
+    
+    /// Cancels the current recording without transcription. Buffers are discarded.
+    /// Called from the Cancel button in ``RecordingView``.
+    func cancelRecording() async {
+        guard isRecording else { return }
+        
+        // Tactile confirmation that the recording was discarded.
+        // Apple recommends preparing the generator up front to minimize
+        // latency on the first notification.
+        let cancelHaptic = UINotificationFeedbackGenerator()
+        cancelHaptic.prepare()
+        cancelHaptic.notificationOccurred(.warning)
+        
+        await audioService.stop()
+        bufferSubscription?.cancel()
+        bufferSubscription = nil
+        collectedAudio = []
+        isRecording = false
+        recordingStartTime = nil
+        errorMessage = nil
+        AppGroup.setRecordingStatus(.idle)
     }
     
     /// Copies the current transcribed text to clipboard.
@@ -214,7 +241,3 @@ final class HomeViewModel: ObservableObject {
         _ = sourceData
     }
 }
-
-// MARK: - UIKit Bridge
-
-import UIKit

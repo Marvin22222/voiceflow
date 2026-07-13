@@ -38,7 +38,6 @@ struct MicButton: View {
     
     @State private var scale: CGFloat = 1.0
     @State private var pulseScale: CGFloat = 1.0
-    @State private var didPressHaptic = false
     
     // MARK: - Haptic Generators
     
@@ -81,37 +80,28 @@ struct MicButton: View {
                         .foregroundStyle(.white)
                 }
                 .gesture(
-                    DragGesture(minimumDistance: 0)
-                        .onChanged { _ in
-                            guard !isRecording, !isProcessing else { return }
-                            if !didPressHaptic {
+                    TapGesture()
+                        .onEnded {
+                            guard !isProcessing else { return }
+                            if isRecording {
+                                // Tap to stop — success haptic + visual scale-down.
+                                releaseHaptic.notificationOccurred(.success)
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                                    scale = 0.92
+                                }
+                                Task { await onRelease() }
+                            } else {
+                                // Tap to start — light haptic + visual scale-down.
                                 pressHaptic.impactOccurred()
-                                didPressHaptic = true
-                            }
-                            Task {
-                                await onPress()
-                            }
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                                scale = 0.92
-                            }
-                        }
-                        .onEnded { _ in
-                            guard isRecording else {
-                                didPressHaptic = false
-                                return
-                            }
-                            releaseHaptic.notificationOccurred(.success)
-                            didPressHaptic = false
-                            Task {
-                                await onRelease()
-                            }
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                                scale = 1.0
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                                    scale = 0.92
+                                }
+                                Task { await onPress() }
                             }
                         }
                 )
         }
-        .accessibilityLabel(Text("Hold to start dictation"))
+        .accessibilityLabel(Text("Tap to start dictation"))
         // TODO(l10n): Localize VoiceOver strings once localization is set up
         .accessibilityValue(Text(isRecording ? "Recording" : "Idle"))
         .accessibilityAddTraits(.isButton)
@@ -129,6 +119,10 @@ struct MicButton: View {
             }
             // Drive pulse animation; gated by Reduce Motion.
             pulseScale = (newValue && !reduceMotion) ? 1.3 : 1.0
+            // Snap button back to resting scale when state changes.
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                scale = 1.0
+            }
         }
     }
     

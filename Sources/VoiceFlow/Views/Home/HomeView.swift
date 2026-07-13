@@ -71,6 +71,12 @@ struct HomeView: View {
         } message: { error in
             Text(error)
         }
+        .fullScreenCover(isPresented: Binding(
+            get: { viewModel.isRecording },
+            set: { _ in /* VM is source of truth; cover auto-dismisses when isRecording flips to false */ }
+        )) {
+            RecordingView(viewModel: viewModel)
+        }
     }
     
     // MARK: - Subviews
