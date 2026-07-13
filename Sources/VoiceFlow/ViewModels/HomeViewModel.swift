@@ -8,6 +8,7 @@
 import AVFoundation
 import Combine
 import Foundation
+import SwiftData
 import SwiftUI
 import UIKit
 import VoiceFlowShared
@@ -61,6 +62,14 @@ final class HomeViewModel: ObservableObject {
     /// Useful for the UI to show a "Live" badge or to gate the partial-text view.
     @Published var isStreaming: Bool = false
 
+    /// Issue #23 — whether to present the polished Result screen as a sheet.
+    /// Set to true by ``transcribeCollectedAudio`` after a successful result.
+    @Published var showResult: Bool = false
+
+    /// Current microphone authorization status (Issue #22).
+    /// Updated on ``onAppear`` and after ``requestMicrophonePermission``.
+    @Published var microphonePermission: AVAudioApplication.recordPermission = .undetermined
+
     // MARK: - Audio Level Constants
     
     /// Maximum number of bars rendered in the live waveform (Issue #20 spec).
@@ -112,8 +121,32 @@ final class HomeViewModel: ObservableObject {
     // MARK: - Lifecycle
     
     func onAppear() async {
+        refreshMicrophonePermission()
         await loadModels()
         await ensureActiveModelLoaded()
+    }
+
+    /// Refresh the cached ``microphonePermission`` from AVFoundation.
+    /// Called on view appear and after ``requestMicrophonePermission``.
+    func refreshMicrophonePermission() {
+        microphonePermission = AVAudioApplication.shared.recordPermission
+    }
+
+    /// Request microphone permission from the user. Updates
+    /// ``microphonePermission`` on completion.
+    ///
+    /// Must be called from a UI context where the system prompt can be
+    /// presented (e.g. directly from a Button action).
+    func requestMicrophonePermission() async {
+        let granted = await AVAudioApplication.requestRecordPermission()
+        microphonePermission = granted ? .granted : .denied
+    }
+
+    /// Open the iOS Settings app. Used when microphone permission is denied
+    /// — users must grant permission there since the app can't re-prompt.
+    func openSystemSettings() {
+        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+        UIApplication.shared.open(url)
     }
     
     // MARK: - Public Actions
@@ -121,6 +154,28 @@ final class HomeViewModel: ObservableObject {
     /// Starts recording. Called by hold-to-talk.
     func startRecording() async {
         guard !isRecording else { return }
+
+        // Issue #22: surface mic-permission errors as a structured state
+        // instead of a generic alert.
+        refreshMicrophonePermission()
+        if microphonePermission == .denied {
+            errorMessage = "Microphone access is denied. Open Settings to grant permission."
+            return
+        }
+        if microphonePermission == .undetermined {
+            await requestMicrophonePermission()
+            guard microphonePermission == .granted else {
+                errorMessage = "Microphone access is required to record audio."
+                return
+            }
+        }
+
+        // Issue #22: surface missing-model as a structured state instead
+        // of failing deep in `audioService.start`.
+        if activeModel == nil {
+            errorMessage = "No model selected. Download a model from the Models tab."
+            return
+        }
 
         errorMessage = nil
         collectedAudio = []
@@ -155,6 +210,19 @@ final class HomeViewModel: ObservableObject {
             return
         }
 
+        await transcribeCollectedAudio()
+    }
+
+    /// Re-runs transcription on the most recently captured audio (Issue #22).
+    ///
+    /// `collectedAudio` is kept after `stopRecording` finishes so this
+    /// method can be called from the error alert's "Retry" action without
+    /// making the user record again. Cleared on the next ``startRecording``.
+    func retryLastTranscription() async {
+        guard !collectedAudio.isEmpty else {
+            errorMessage = "Nothing to retry."
+            return
+        }
         await transcribeCollectedAudio()
     }
     
@@ -368,28 +436,46 @@ final class HomeViewModel: ObservableObject {
     
     private func transcribeCollectedAudio() async {
         guard !collectedAudio.isEmpty else { return }
-        
+
         isTranscribing = true
         AppGroup.setRecordingStatus(.processing)
         defer {
             isTranscribing = false
             AppGroup.setRecordingStatus(.idle)
         }
-        
+
         // Concatenate all buffers into one
         guard let combined = concatenateBuffers(collectedAudio) else {
             errorMessage = "Could not combine audio buffers"
             return
         }
-        
+
         do {
             let result = try await transcriptionService.transcribe(combined)
             lastResult = result
             transcribedText = result.text
             AppGroup.setPendingText(result.text)
+            // Issue #23: surface the result via the published `showResult` flag
+            // so ``HomeView`` can present the polished Result screen.
+            showResult = true
         } catch {
             errorMessage = "Transcription failed: \(error.localizedDescription)"
             AppGroup.setRecordingStatus(.error)
+        }
+    }
+
+    /// Persist the last transcription result to SwiftData history.
+    /// Called from ``ResultView`` when the user dismisses (taps "Done").
+    ///
+    /// Safe to call when ``lastResult`` is nil — it just no-ops.
+    func saveToHistory(modelContext: ModelContext) {
+        guard let result = lastResult else { return }
+        let record = TranscriptionRecord(from: result)
+        modelContext.insert(record)
+        do {
+            try modelContext.save()
+        } catch {
+            errorMessage = "Could not save to history: \(error.localizedDescription)"
         }
     }
     

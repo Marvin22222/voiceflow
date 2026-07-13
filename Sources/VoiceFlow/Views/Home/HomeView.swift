@@ -11,6 +11,13 @@ import VoiceFlowShared
 // MARK: - HomeView
 
 /// Main screen for capturing voice. Hold to talk, release to insert.
+///
+/// Layered states (Issue #22):
+/// - **Blocked** — microphone permission denied or no model downloaded.
+///   Renders an inline ``ErrorStateView`` or ``EmptyStateView`` in place of
+///   the mic button so the user sees a clear next action.
+/// - **Ready** — model loaded, permission granted. Shows the hold-to-talk
+///   mic button with the current model badge and result preview.
 struct HomeView: View {
     
     // MARK: - Environment
@@ -21,8 +28,31 @@ struct HomeView: View {
     // MARK: - State
     
     @StateObject private var viewModel: HomeViewModel
-    // TODO(#21): Settings-Sheet hier einhängen (.sheet(isPresented: $showSettings))
     @State private var showSettings = false
+    
+    // MARK: - Computed State (Issue #22)
+    
+    /// Whether the app is fully ready to record (permission + model).
+    private var isBlocked: Bool {
+        viewModel.microphonePermission == .denied || viewModel.activeModel == nil
+    }
+    
+    /// Whether we're waiting for the user to grant microphone permission
+    /// (system prompt pending or about to be shown).
+    private var needsMicrophonePermission: Bool {
+        viewModel.microphonePermission == .undetermined
+    }
+    
+    /// Why recording is currently blocked (nil when ready).
+    private var blockedState: BlockedState? {
+        if viewModel.microphonePermission == .denied {
+            return .microphoneDenied
+        }
+        if viewModel.activeModel == nil {
+            return .noModel
+        }
+        return nil
+    }
     
     // MARK: - Initialization
     
@@ -46,11 +76,12 @@ struct HomeView: View {
                 VStack(spacing: Spacing.lg) {
                     header
                     title
-                    // 30 % vom oberen Rand minus halbe Button-Höhe → Button-Zentrum auf ~30 %
-                    Spacer().frame(height: max(0, geo.size.height * 0.3 - 50))
-                    micButton
+                    Spacer().frame(height: max(0, geo.size.height * 0.25 - 50))
+                    content
                     Spacer()
-                    hintView
+                    if !isBlocked {
+                        hintView
+                    }
                     modelSelector
                 }
                 .padding(Spacing.md)
@@ -58,6 +89,11 @@ struct HomeView: View {
         }
         .task {
             await viewModel.onAppear()
+        }
+        // Issue #27: respond to `voiceflow://record` deep-links from the
+        // keyboard extension by triggering a recording session.
+        .onReceive(NotificationCenter.default.publisher(for: .voiceflowStartRecording)) { _ in
+            Task { await viewModel.startRecording() }
         }
         .alert(
             "Error",
@@ -67,7 +103,20 @@ struct HomeView: View {
             ),
             presenting: viewModel.errorMessage
         ) { _ in
-            Button("OK") { viewModel.errorMessage = nil }
+            // Issue #22: offer a Retry button when transcription failed.
+            // Heuristic: errors that mention "transcrib" are recoverable;
+            // other errors (e.g. permission, storage) just dismiss.
+            if let msg = viewModel.errorMessage, msg.lowercased().contains("transcrib") {
+                Button("Retry") {
+                    viewModel.errorMessage = nil
+                    Task { await viewModel.retryLastTranscription() }
+                }
+                Button("Cancel", role: .cancel) {
+                    viewModel.errorMessage = nil
+                }
+            } else {
+                Button("OK") { viewModel.errorMessage = nil }
+            }
         } message: { error in
             Text(error)
         }
@@ -76,6 +125,59 @@ struct HomeView: View {
             set: { _ in /* VM is source of truth; cover auto-dismisses when isRecording flips to false */ }
         )) {
             RecordingView(viewModel: viewModel)
+        }
+        // Issue #23: present polished Result screen as a sheet after
+        // transcription completes. The VM flips showResult=true on success;
+        // the sheet auto-dismisses when the user taps Back/Insert (which
+        // sets it back to false).
+        .sheet(isPresented: Binding(
+            get: { viewModel.showResult && !viewModel.transcribedText.isEmpty },
+            set: { presented in
+                if !presented { viewModel.showResult = false }
+            }
+        )) {
+            ResultView(viewModel: viewModel)
+                .presentationDetents([.large])
+        }
+        .sheet(isPresented: $showSettings) {
+            SettingsView()
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(AppColors.backgroundDark)
+        }
+    }
+    
+    // MARK: - Content Switch (Issue #22)
+    
+    /// The main content area: either the ready-state mic button, or one of
+    /// the blocked-state views (model missing / mic denied / permission pending).
+    @ViewBuilder
+    private var content: some View {
+        switch blockedState {
+        case .microphoneDenied:
+            ErrorStateView(
+                icon: "mic.slash.fill",
+                title: "Microphone Access Denied",
+                message: "VoiceFlow needs microphone access to record audio. Open Settings to grant permission.",
+                primaryActionLabel: "Open Settings",
+                primaryAction: {
+                    viewModel.openSystemSettings()
+                },
+                secondaryActionLabel: "Retry",
+                secondaryAction: {
+                    Task { await viewModel.requestMicrophonePermission() }
+                }
+            )
+        case .noModel:
+            EmptyStateView(
+                icon: "arrow.down.circle.fill",
+                title: "No Model Downloaded",
+                message: "Download a transcription model to start using VoiceFlow. Whisper Base is a good starting point (~75 MB). Switch to the Models tab below to get started.",
+                actionLabel: nil,
+                action: nil
+            )
+        case nil:
+            micButton
         }
     }
     
@@ -102,7 +204,7 @@ struct HomeView: View {
     }
     
     private var hintView: some View {
-        Text("Press and hold")
+        Text(viewModel.transcribedText.isEmpty ? "Press and hold" : "Tap mic to record again")
             .font(.footnote)
             .foregroundStyle(.secondary)
     }
@@ -156,6 +258,16 @@ struct HomeView: View {
     }
 }
 
+// MARK: - BlockedState
+
+/// Reason the recording flow is blocked (Issue #22).
+private enum BlockedState {
+    case microphoneDenied
+    case noModel
+}
+
+// Removed unused AppTab declaration (was previously here).
+
 // MARK: - ModelBadge
 
 /// Small badge showing the currently active model.
@@ -186,7 +298,20 @@ struct ModelBadge: View {
 
 // MARK: - Preview
 
-#Preview {
+#Preview("Ready") {
+    HomeView()
+        .environment(TranscriptionService())
+        .environment(ModelManager())
+}
+
+#Preview("Blocked — No Model") {
+    // Force the no-model state by wrapping with a VM that has no active model.
+    HomeView()
+        .environment(TranscriptionService())
+        .environment(ModelManager())
+}
+
+#Preview("Blocked — Mic Denied") {
     HomeView()
         .environment(TranscriptionService())
         .environment(ModelManager())

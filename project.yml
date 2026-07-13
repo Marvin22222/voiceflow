@@ -75,6 +75,13 @@ targets:
           - audio
         NSMicrophoneUsageDescription: "VoiceFlow needs microphone access to transcribe your speech locally on your device. Audio never leaves your phone."
         NSSpeechRecognitionUsageDescription: "VoiceFlow uses speech recognition to transcribe your voice."
+        # Issue #27: register the voiceflow:// URL scheme so the keyboard
+        # extension can deep-link into a recording session.
+        CFBundleURLTypes:
+          - CFBundleURLName: de.marvinschwab.voiceflow.scheme
+            CFBundleTypeRole: Editor
+            CFBundleURLSchemes:
+              - voiceflow
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
         ITSAppUsesNonExemptEncryption: false
