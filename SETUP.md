@@ -42,6 +42,59 @@ That's it! The app should build and launch in the simulator.
 
 ---
 
+## 🎯 First Run on iPhone Simulator (Mac-focused)
+
+Focused checklist for running the app in Xcode on macOS for the first time.
+
+### Prerequisites
+
+| Requirement | Min | Notes |
+|---|---|---|
+| **Mac** | Apple Silicon (M1/M2/M3/M4) | **Required** — WhisperKit uses Apple Neural Engine (ANE). Intel Macs won't run real transcription. |
+| **macOS** | 14.0 (Sonoma) | For Xcode 15 |
+| **Xcode** | 15.0 | Ships iOS 17+ SDK |
+| **Internet** | Yes | First run downloads the Whisper model (~75–150 MB) |
+| **Disk space** | ~2 GB | Xcode build cache + Whisper model files |
+
+### In Xcode (after `xcodegen generate` + `open VoiceFlow.xcodeproj`)
+
+1. **Top-bar scheme:** pick `VoiceFlow` (not `VoiceFlowKeyboard`).
+2. **Destination:** pick any iPhone simulator — iPhone 15 Pro recommended.
+3. **Signing & Capabilities** (first time only):
+   - Select the `VoiceFlow` target → **Signing & Capabilities** → Team → pick your personal Apple ID (free dev account is fine for simulator builds; not needed for keyboard extension in simulator).
+   - Repeat for `VoiceFlowKeyboard` if you want to test the keyboard.
+4. Press **⌘R** to build & run. First build takes ~30–90 s (WhisperKit dependency downloads).
+
+### What happens on first launch
+
+1. **Onboarding (5 pages)** → Welcome → Choose Model → Microphone Permission → Keyboard Setup → Ready.
+2. **HomeView** shows empty state: "No Model Downloaded".
+3. Tap the **Models tab** at the bottom → tap **Whisper Base** → download starts.
+4. **Wait ~1–3 min** for the ~150 MB download (one-time, then cached).
+5. Back to **Home tab** → **tap-and-hold** the mic button → release → transcribed text appears.
+6. History saves every transcription automatically (SwiftData).
+
+### Quick test without the model download (optional, dev only)
+
+If you want to iterate on UI without waiting for the Whisper download:
+
+1. In Xcode, **Edit Scheme → Run → Arguments** → add `-UseMockBackend YES` to "Arguments Passed On Launch".
+2. Or temporarily set `TranscriptionBackendFactory.mock` in `VoiceFlowApp.init()` (search for `TranscriptionBackendFactory.live` in `TranscriptionService.swift`).
+
+The mock backend returns "Mock transcription result" after ~1 s — perfect for previewing the result UI without real audio.
+
+### Common iPhone Simulator pitfalls
+
+| Symptom | Fix |
+|---|---|
+| "WhisperKit not found" | Xcode → File → Packages → Resolve Package Versions |
+| Microphone silent in simulator | Simulator → Features → Trigger "Use your Mac as microphone source" |
+| "Failed to set up SwiftData" | Delete the app from the simulator and rebuild |
+| Mic permission prompt never appears | Simulator → Device → Erase All Content and Settings, then rebuild |
+| Keyboard extension won't enable | iOS Settings → General → Keyboard → Keyboards → Add New Keyboard → VoiceFlow → Allow Full Access |
+
+---
+
 ## 📁 Project Structure
 
 After running `xcodegen generate`, you'll have:
