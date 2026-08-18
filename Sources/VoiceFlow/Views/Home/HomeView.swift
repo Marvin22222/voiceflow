@@ -29,6 +29,12 @@ struct HomeView: View {
     
     @StateObject private var viewModel: HomeViewModel
     @State private var showSettings = false
+
+    /// One-shot celebration burst when a new result arrives. Only fires on
+    /// the *first* result in this session so it stays a delight moment
+    /// rather than becoming visual noise on every recording.
+    @State private var showCelebrationBurst = false
+    @State private var didCelebrateFirstResult = false
     
     // MARK: - Computed State (Issue #22)
     
@@ -70,8 +76,9 @@ struct HomeView: View {
     
     var body: some View {
         ZStack {
-            AppColors.backgroundDark.ignoresSafeArea()
-            
+            AnimatedGradientBackground()
+                .ignoresSafeArea()
+
             GeometryReader { geo in
                 VStack(spacing: Spacing.lg) {
                     header
@@ -144,6 +151,22 @@ struct HomeView: View {
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(AppColors.backgroundDark)
+        }
+        .overlay {
+            // First-result celebration: a subtle particle burst with checkmark.
+            // Issue #23 polish — makes the first transcription feel rewarding.
+            SuccessBurst(isActive: $showCelebrationBurst)
+                .allowsHitTesting(false)
+        }
+        .onChange(of: viewModel.lastResult) { _, newResult in
+            guard let newResult, !didCelebrateFirstResult else { return }
+            didCelebrateFirstResult = true
+            showCelebrationBurst = true
+            // Light haptic on first success.
+            let generator = UINotificationFeedbackGenerator()
+            generator.prepare()
+            generator.notificationOccurred(.success)
+            _ = newResult // suppress unused
         }
     }
     

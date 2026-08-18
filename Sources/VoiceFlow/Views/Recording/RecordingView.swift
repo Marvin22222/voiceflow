@@ -48,7 +48,10 @@ struct RecordingView: View {
 
     var body: some View {
         ZStack {
-            AppColors.backgroundDark.ignoresSafeArea()
+            // Slightly more intense background during recording — gives the
+            // full-screen record UI a sense of focus / "we're capturing now".
+            AnimatedGradientBackground(intensity: 1.4)
+                .ignoresSafeArea()
 
             VStack(spacing: Spacing.xl) {
                 recordingIndicator

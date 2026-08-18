@@ -23,25 +23,29 @@ struct OnboardingFlow: View {
     // MARK: - Body
     
     var body: some View {
-        TabView(selection: $currentPage) {
-            WelcomePage(onNext: { advance() })
-                .tag(0)
-            
-            ChooseModelPage(onNext: { advance() })
-                .tag(1)
-            
-            MicrophonePermissionPage(onNext: { advance() })
-                .tag(2)
-            
-            KeyboardSetupPage(onNext: { advance() }, onSkip: { finish() })
-                .tag(3)
-            
-            ReadyPage(onFinish: { finish() })
-                .tag(4)
+        ZStack {
+            AnimatedGradientBackground()
+                .ignoresSafeArea()
+
+            TabView(selection: $currentPage) {
+                WelcomePage(onNext: { advance() })
+                    .tag(0)
+
+                ChooseModelPage(onNext: { advance() })
+                    .tag(1)
+
+                MicrophonePermissionPage(onNext: { advance() })
+                    .tag(2)
+
+                KeyboardSetupPage(onNext: { advance() }, onSkip: { finish() })
+                    .tag(3)
+
+                ReadyPage(onFinish: { finish() })
+                    .tag(4)
+            }
+            .tabViewStyle(.page(indexDisplayMode: .always))
+            .indexViewStyle(.page(backgroundDisplayMode: .always))
         }
-        .tabViewStyle(.page(indexDisplayMode: .always))
-        .background(AppColors.backgroundDark.ignoresSafeArea())
-        .indexViewStyle(.page(backgroundDisplayMode: .always))
     }
     
     // MARK: - Actions
