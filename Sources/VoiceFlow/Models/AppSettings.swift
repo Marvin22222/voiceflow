@@ -31,29 +31,46 @@ enum Theme: String, Codable, CaseIterable {
 /// Available accent colors.
 enum AccentColorOption: String, Codable, CaseIterable {
     case indigo
+    case violet
+    case pink
     case coral
     case mint
     case amber
+    case cyan
     case sky
-    
+
     var displayName: String {
         switch self {
         case .indigo: return "Indigo"
+        case .violet: return "Violet"
+        case .pink: return "Pink"
         case .coral: return "Coral"
         case .mint: return "Mint"
         case .amber: return "Amber"
+        case .cyan: return "Cyan"
         case .sky: return "Sky"
         }
     }
-    
+
     var hexValue: String {
         switch self {
         case .indigo: return "#5B5FE6"
+        case .violet: return "#8C52EB"
+        case .pink: return "#F4529E"
         case .coral: return "#FF4D6D"
         case .mint: return "#3DD68C"
         case .amber: return "#FFB340"
+        case .cyan: return "#33C7F5"
         case .sky: return "#4DA8FF"
         }
+    }
+
+    /// Resolved SwiftUI `Color` for the accent.
+    var color: Color {
+        if #available(iOS 14.0, *) {
+            return Color(hex: hexValue)
+        }
+        return .blue
     }
 }
 

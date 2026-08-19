@@ -2,7 +2,9 @@
 //  HomeView.swift
 //  VoiceFlow
 //
-//  Main capture screen with hold-to-talk mic button.
+//  Main capture screen with iOS 26 Liquid Glass design language.
+//  Hold-to-talk mic button centered on a layered background
+//  with translucent glass cards for status and result preview.
 //
 
 import SwiftUI
@@ -19,14 +21,14 @@ import VoiceFlowShared
 /// - **Ready** — model loaded, permission granted. Shows the hold-to-talk
 ///   mic button with the current model badge and result preview.
 struct HomeView: View {
-    
+
     // MARK: - Environment
-    
+
     @Environment(TranscriptionService.self) private var transcriptionService
     @Environment(ModelManager.self) private var modelManager
-    
+
     // MARK: - State
-    
+
     @StateObject private var viewModel: HomeViewModel
     @State private var showSettings = false
 
@@ -35,21 +37,15 @@ struct HomeView: View {
     /// rather than becoming visual noise on every recording.
     @State private var showCelebrationBurst = false
     @State private var didCelebrateFirstResult = false
-    
+
     // MARK: - Computed State (Issue #22)
-    
+
     /// Whether the app is fully ready to record (permission + model).
     private var isBlocked: Bool {
         viewModel.microphonePermission == .denied || viewModel.activeModel == nil
     }
-    
-    /// Whether we're waiting for the user to grant microphone permission
-    /// (system prompt pending or about to be shown).
-    private var needsMicrophonePermission: Bool {
-        viewModel.microphonePermission == .undetermined
-    }
-    
-    /// Why recording is currently blocked (nil when ready).
+
+    /// Reason recording is currently blocked (nil when ready).
     private var blockedState: BlockedState? {
         if viewModel.microphonePermission == .denied {
             return .microphoneDenied
@@ -59,9 +55,9 @@ struct HomeView: View {
         }
         return nil
     }
-    
+
     // MARK: - Initialization
-    
+
     init() {
         // We need to use a placeholder here since @Environment isn't available in init
         // The real initialization happens in .onAppear or body
@@ -71,27 +67,36 @@ struct HomeView: View {
             modelManager: ModelManager()
         ))
     }
-    
+
     // MARK: - Body
-    
+
     var body: some View {
         ZStack {
             AnimatedGradientBackground()
                 .ignoresSafeArea()
 
             GeometryReader { geo in
-                VStack(spacing: Spacing.lg) {
+                VStack(spacing: Spacing.md) {
                     header
-                    title
-                    Spacer().frame(height: max(0, geo.size.height * 0.25 - 50))
-                    content
+
                     Spacer()
+                        .frame(height: Spacing.lg)
+
+                    content
+
+                    Spacer()
+
                     if !isBlocked {
                         hintView
+                            .padding(.bottom, Spacing.sm)
                     }
+
                     modelSelector
+                        .padding(.bottom, Spacing.md)
                 }
-                .padding(Spacing.md)
+                .padding(.horizontal, Spacing.pageHorizontal)
+                .padding(.top, Spacing.sm)
+                .frame(width: geo.size.width, height: geo.size.height)
             }
         }
         .task {
@@ -111,8 +116,6 @@ struct HomeView: View {
             presenting: viewModel.errorMessage
         ) { _ in
             // Issue #22: offer a Retry button when transcription failed.
-            // Heuristic: errors that mention "transcrib" are recoverable;
-            // other errors (e.g. permission, storage) just dismiss.
             if let msg = viewModel.errorMessage, msg.lowercased().contains("transcrib") {
                 Button("Retry") {
                     viewModel.errorMessage = nil
@@ -145,16 +148,18 @@ struct HomeView: View {
         )) {
             ResultView(viewModel: viewModel)
                 .presentationDetents([.large])
+                .presentationBackground(.regularMaterial)
+                .presentationCornerRadius
         }
         .sheet(isPresented: $showSettings) {
             SettingsView()
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
-                .presentationBackground(AppColors.backgroundDark)
+                .presentationBackground(.regularMaterial)
+                .presentationCornerRadius
         }
         .overlay {
             // First-result celebration: a subtle particle burst with checkmark.
-            // Issue #23 polish — makes the first transcription feel rewarding.
             SuccessBurst(isActive: $showCelebrationBurst)
                 .allowsHitTesting(false)
         }
@@ -162,16 +167,16 @@ struct HomeView: View {
             guard let newResult, !didCelebrateFirstResult else { return }
             didCelebrateFirstResult = true
             showCelebrationBurst = true
-            // Light haptic on first success.
+            // Subtle haptic on first success.
             let generator = UINotificationFeedbackGenerator()
             generator.prepare()
             generator.notificationOccurred(.success)
             _ = newResult // suppress unused
         }
     }
-    
+
     // MARK: - Content Switch (Issue #22)
-    
+
     /// The main content area: either the ready-state mic button, or one of
     /// the blocked-state views (model missing / mic denied / permission pending).
     @ViewBuilder
@@ -203,35 +208,85 @@ struct HomeView: View {
             micButton
         }
     }
-    
+
     // MARK: - Subviews
-    
+
     private var header: some View {
         HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Good " + timeOfDayGreeting)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Text("VoiceFlow")
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .tracking(-0.5)
+            }
             Spacer()
             Button {
                 showSettings = true
             } label: {
                 Image(systemName: "gearshape.fill")
-                    .font(.title2)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .frame(width: 44, height: 44)
+                    .background(
+                        Circle()
+                            .fill(.ultraThinMaterial)
+                    )
+                    .overlay(
+                        Circle()
+                            .stroke(
+                                LinearGradient(
+                                    colors: [
+                                        Color.white.opacity(0.4),
+                                        Color.white.opacity(0.0)
+                                    ],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                ),
+                                lineWidth: 1
+                            )
+                    )
             }
+            .accessibilityLabel("Settings")
         }
     }
-    
-    private var title: some View {
-        Text("VoiceFlow")
-            .font(.title2)
-            .lineLimit(1)
-            .accessibilityAddTraits(.isHeader)
+
+    private var timeOfDayGreeting: String {
+        let hour = Calendar.current.component(.hour, from: Date())
+        switch hour {
+        case 5..<12: return "morning"
+        case 12..<18: return "afternoon"
+        default: return "evening"
+        }
     }
-    
+
     private var hintView: some View {
-        Text(viewModel.transcribedText.isEmpty ? "Press and hold" : "Tap mic to record again")
+        Text(viewModel.transcribedText.isEmpty ? "Tap to dictate" : "Tap to record again")
             .font(.footnote)
             .foregroundStyle(.secondary)
+            .padding(.horizontal, Spacing.md)
+            .padding(.vertical, Spacing.sm)
+            .background(
+                Capsule()
+                    .fill(.ultraThinMaterial)
+            )
+            .overlay(
+                Capsule()
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.3),
+                                Color.white.opacity(0.0)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        ),
+                        lineWidth: 0.5
+                    )
+            )
     }
-    
+
     private var micButton: some View {
         MicButton(
             isRecording: viewModel.isRecording,
@@ -244,9 +299,9 @@ struct HomeView: View {
             }
         )
     }
-    
+
     private var modelSelector: some View {
-        VStack(spacing: Spacing.sm) {
+        VStack(spacing: Spacing.smPlus) {
             // TODO(#23): transcribedText + Copy/Reuse-Buttons (Result Screen)
             if !viewModel.transcribedText.isEmpty {
                 Text(viewModel.transcribedText)
@@ -254,27 +309,32 @@ struct HomeView: View {
                     .foregroundStyle(.white)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, Spacing.md)
-                    .padding(.vertical, Spacing.sm)
-                    .background(AppColors.surfaceDark)
-                    .clipShape(RoundedRectangle(cornerRadius: Sizing.cornerRadius))
-                    .frame(maxHeight: 100)
+                    .padding(.vertical, Spacing.md)
+                    .frame(maxWidth: .infinity)
+                    .frame(maxHeight: 120)
+                    .background(
+                        RoundedRectangle(cornerRadius: Sizing.cardCornerRadius, style: .continuous)
+                            .fill(.ultraThinMaterial)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Sizing.cardCornerRadius, style: .continuous)
+                            .stroke(
+                                LinearGradient(
+                                    colors: [
+                                        Color.white.opacity(0.3),
+                                        Color.white.opacity(0.0)
+                                    ],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                ),
+                                lineWidth: 1
+                            )
+                    )
             }
-            
-            HStack(spacing: Spacing.md) {
+
+            HStack(spacing: Spacing.sm) {
                 if let activeModel = viewModel.activeModel {
                     ModelBadge(model: activeModel)
-                }
-                
-                // TODO(#XX): Switch-Model-Button → Picker-Screen
-                Button {
-                    // TODO: Show model picker
-                } label: {
-                    HStack(spacing: Spacing.xs) {
-                        Image(systemName: "square.stack.3d.up")
-                        Text("Switch Model")
-                            .font(.caption)
-                    }
-                    .foregroundStyle(.secondary)
                 }
             }
         }
@@ -289,33 +349,47 @@ private enum BlockedState {
     case noModel
 }
 
-// Removed unused AppTab declaration (was previously here).
-
 // MARK: - ModelBadge
 
 /// Small badge showing the currently active model.
 struct ModelBadge: View {
-    
+
     // MARK: - Properties
-    
+
     let model: ModelDefinition
-    
+
     // MARK: - Body
-    
+
     var body: some View {
         HStack(spacing: Spacing.xs) {
             Image(systemName: model.backendType.symbolName)
-                .font(.caption)
+                .font(.system(size: 12, weight: .semibold))
             Text(model.displayName)
-                .font(.caption.weight(.medium))
+                .font(.caption.weight(.semibold))
             Text(model.sizeString)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }
-        .padding(.horizontal, Spacing.sm)
-        .padding(.vertical, Spacing.xs)
-        .background(AppColors.surfaceDark)
-        .clipShape(Capsule())
+        .padding(.horizontal, Spacing.md)
+        .padding(.vertical, Spacing.sm)
+        .background(
+            Capsule()
+                .fill(.ultraThinMaterial)
+        )
+        .overlay(
+            Capsule()
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.3),
+                            Color.white.opacity(0.0)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ),
+                    lineWidth: 0.5
+                )
+        )
     }
 }
 
@@ -328,7 +402,6 @@ struct ModelBadge: View {
 }
 
 #Preview("Blocked — No Model") {
-    // Force the no-model state by wrapping with a VM that has no active model.
     HomeView()
         .environment(TranscriptionService())
         .environment(ModelManager())

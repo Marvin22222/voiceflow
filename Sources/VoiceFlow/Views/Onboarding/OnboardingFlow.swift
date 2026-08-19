@@ -2,26 +2,28 @@
 //  OnboardingFlow.swift
 //  VoiceFlow
 //
-//  5-screen onboarding experience for first launch.
+//  iOS 26 Liquid Glass style 5-screen onboarding experience. Each
+//  page features a glass-card layout with iOS 26 typography, smooth
+//  page transitions, and refined spring animations.
 //
 
 import SwiftUI
 
 // MARK: - OnboardingFlow
 
-/// First-launch onboarding flow.
+/// First-launch onboarding flow with iOS 26 Liquid Glass design.
 struct OnboardingFlow: View {
-    
+
     // MARK: - Properties
-    
+
     let onFinish: () -> Void
-    
+
     // MARK: - State
-    
+
     @State private var currentPage = 0
-    
+
     // MARK: - Body
-    
+
     var body: some View {
         ZStack {
             AnimatedGradientBackground()
@@ -47,15 +49,15 @@ struct OnboardingFlow: View {
             .indexViewStyle(.page(backgroundDisplayMode: .always))
         }
     }
-    
+
     // MARK: - Actions
-    
+
     private func advance() {
-        withAnimation {
+        withAnimation(.glassSmooth) {
             currentPage += 1
         }
     }
-    
+
     private func finish() {
         onFinish()
     }
@@ -65,44 +67,75 @@ struct OnboardingFlow: View {
 
 struct WelcomePage: View {
     let onNext: () -> Void
-    
+
     var body: some View {
         VStack(spacing: Spacing.xl) {
             Spacer()
-            
+
             VStack(spacing: Spacing.md) {
                 Text("Welcome to")
-                    .font(.title2)
+                    .font(.system(size: 17, weight: .semibold, design: .rounded))
                     .foregroundStyle(.secondary)
-                Text("VoiceFlow ✨")
-                    .font(.largeTitle.bold())
+                    .tracking(0.2)
+
+                Text("VoiceFlow")
+                    .font(.system(size: 44, weight: .bold, design: .rounded))
+                    .tracking(-0.5)
+
                 Text("Voice-to-text, 100% local.\nNo subscriptions. No cloud.")
-                    .font(.headline)
+                    .font(.system(size: 17, weight: .medium, design: .rounded))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
-            
+
             Spacer()
-            
+
+            // Glass card with features
             VStack(alignment: .leading, spacing: Spacing.md) {
-                FeatureRow(icon: "lock.shield.fill", title: "Privacy first")
-                FeatureRow(icon: "gift.fill", title: "Free forever")
-                FeatureRow(icon: "cpu.fill", title: "On-device AI")
+                FeatureRow(icon: "lock.shield.fill", title: "Privacy first", tint: AppColors.violet)
+                FeatureRow(icon: "gift.fill", title: "Free forever", tint: AppColors.pink)
+                FeatureRow(icon: "cpu.fill", title: "On-device AI", tint: AppColors.cyan)
             }
-            .padding(.horizontal, Spacing.xl)
-            
+            .padding(Spacing.lg)
+            .frame(maxWidth: .infinity)
+            .background(
+                RoundedRectangle(cornerRadius: Sizing.cardCornerRadius, style: .continuous)
+                    .fill(.ultraThinMaterial)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: Sizing.cardCornerRadius, style: .continuous)
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.4),
+                                Color.white.opacity(0.0)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        ),
+                        lineWidth: 1
+                    )
+            )
+            .shadow(color: .black.opacity(0.12), radius: 16, y: 8)
+            .padding(.horizontal, Spacing.pageHorizontal)
+
             Spacer()
-            
+
             Button(action: onNext) {
                 Text("Get Started")
-                    .font(.headline)
+                    .font(.system(size: 17, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .frame(height: Sizing.buttonHeight)
+                    .background(
+                        Capsule()
+                            .fill(.appAccent)
+                    )
+                    .shadow(color: .appAccent.opacity(0.4), radius: 16, y: 8)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(.appAccent)
-            .padding(.horizontal, Spacing.md)
-            .padding(.bottom, Spacing.xl)
+            .buttonStyle(PressableButtonStyle())
+            .padding(.horizontal, Spacing.pageHorizontal)
+            .padding(.bottom, Spacing.xxl)
         }
     }
 }
@@ -112,22 +145,24 @@ struct WelcomePage: View {
 struct ChooseModelPage: View {
     let onNext: () -> Void
     @State private var selectedModel: ModelDefinition = .whisperBase
-    
+
     var body: some View {
         VStack(spacing: Spacing.lg) {
             ProgressIndicator(current: 1, total: 4)
                 .padding(.top, Spacing.lg)
-            
+                .padding(.horizontal, Spacing.pageHorizontal)
+
             VStack(alignment: .leading, spacing: Spacing.sm) {
                 Text("Choose your model")
-                    .font(.title.bold())
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .tracking(-0.4)
                 Text("You can change this anytime in Settings.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, Spacing.md)
-            
+            .padding(.horizontal, Spacing.pageHorizontal)
+
             VStack(spacing: Spacing.sm) {
                 ForEach([ModelDefinition.whisperTiny, .whisperBase, .whisperSmall], id: \.id) { model in
                     ModelPickerRow(
@@ -137,20 +172,25 @@ struct ChooseModelPage: View {
                     )
                 }
             }
-            .padding(.horizontal, Spacing.md)
-            
+            .padding(.horizontal, Spacing.pageHorizontal)
+
             Spacer()
-            
+
             Button(action: onNext) {
                 Text("Continue")
-                    .font(.headline)
+                    .font(.system(size: 17, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .frame(height: Sizing.buttonHeight)
+                    .background(
+                        Capsule()
+                            .fill(.appAccent)
+                    )
+                    .shadow(color: .appAccent.opacity(0.4), radius: 16, y: 8)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(.appAccent)
-            .padding(.horizontal, Spacing.md)
-            .padding(.bottom, Spacing.xl)
+            .buttonStyle(PressableButtonStyle())
+            .padding(.horizontal, Spacing.pageHorizontal)
+            .padding(.bottom, Spacing.xxl)
         }
     }
 }
@@ -160,41 +200,71 @@ struct ChooseModelPage: View {
 struct MicrophonePermissionPage: View {
     let onNext: () -> Void
     @State private var permissionGranted = false
-    
+
     var body: some View {
         VStack(spacing: Spacing.xl) {
             ProgressIndicator(current: 2, total: 4)
                 .padding(.top, Spacing.lg)
-            
+                .padding(.horizontal, Spacing.pageHorizontal)
+
             Spacer()
-            
+
             VStack(spacing: Spacing.lg) {
-                Image(systemName: "mic.circle.fill")
-                    .font(.system(size: 100))
-                    .foregroundStyle(.appAccent)
-                
+                ZStack {
+                    Circle()
+                        .fill(.ultraThinMaterial)
+                        .frame(width: 140, height: 140)
+                        .overlay(
+                            Circle()
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [
+                                            Color.white.opacity(0.4),
+                                            Color.white.opacity(0.0)
+                                        ],
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    ),
+                                    lineWidth: 1.2
+                                )
+                        )
+                    Circle()
+                        .fill(.appAccent.opacity(0.15))
+                        .frame(width: 110, height: 110)
+                    Image(systemName: "mic.fill")
+                        .font(.system(size: 56, weight: .semibold))
+                        .foregroundStyle(.appAccent)
+                }
+                .shadow(color: .appAccent.opacity(0.3), radius: 24, y: 12)
+
                 Text("Allow microphone access")
-                    .font(.title2.bold())
-                
+                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                    .tracking(-0.3)
+
                 Text("We need the microphone to capture your voice. Audio is processed 100% on-device and never leaves your phone.")
-                    .font(.body)
+                    .font(.system(size: 15, weight: .medium, design: .rounded))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, Spacing.xl)
             }
-            
+
             Spacer()
-            
+
             Button(action: onNext) {
                 Text(permissionGranted ? "Continue" : "Allow Microphone")
-                    .font(.headline)
+                    .font(.system(size: 17, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .frame(height: Sizing.buttonHeight)
+                    .background(
+                        Capsule()
+                            .fill(.appAccent)
+                    )
+                    .shadow(color: .appAccent.opacity(0.4), radius: 16, y: 8)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(.appAccent)
-            .padding(.horizontal, Spacing.md)
-            .padding(.bottom, Spacing.xl)
+            .buttonStyle(PressableButtonStyle())
+            .padding(.horizontal, Spacing.pageHorizontal)
+            .padding(.bottom, Spacing.xxl)
         }
     }
 }
@@ -204,47 +274,55 @@ struct MicrophonePermissionPage: View {
 struct KeyboardSetupPage: View {
     let onNext: () -> Void
     let onSkip: () -> Void
-    
+
     var body: some View {
         VStack(spacing: Spacing.lg) {
             ProgressIndicator(current: 3, total: 4)
                 .padding(.top, Spacing.lg)
-            
+                .padding(.horizontal, Spacing.pageHorizontal)
+
             VStack(alignment: .leading, spacing: Spacing.sm) {
                 Text("Enable Keyboard")
-                    .font(.title.bold())
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .tracking(-0.4)
                 Text("Optional — use VoiceFlow in any app:")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, Spacing.md)
-            
-            VStack(alignment: .leading, spacing: Spacing.md) {
+            .padding(.horizontal, Spacing.pageHorizontal)
+
+            VStack(spacing: Spacing.sm) {
                 StepRow(number: 1, text: "Open Settings app")
                 StepRow(number: 2, text: "General → Keyboard → Keyboards")
                 StepRow(number: 3, text: "Add New Keyboard...")
                 StepRow(number: 4, text: "Select \"VoiceFlow\"")
             }
-            .padding(.horizontal, Spacing.md)
-            
+            .padding(.horizontal, Spacing.pageHorizontal)
+
             Spacer()
-            
+
             VStack(spacing: Spacing.sm) {
                 Button(action: onNext) {
                     Text("I've Done This")
-                        .font(.headline)
+                        .font(.system(size: 17, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
                         .frame(height: Sizing.buttonHeight)
+                        .background(
+                            Capsule()
+                                .fill(.appAccent)
+                        )
+                        .shadow(color: .appAccent.opacity(0.4), radius: 16, y: 8)
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(.appAccent)
-                
+                .buttonStyle(PressableButtonStyle())
+
                 Button("Skip for Now", action: onSkip)
+                    .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
-            .padding(.horizontal, Spacing.md)
-            .padding(.bottom, Spacing.xl)
+            .padding(.horizontal, Spacing.pageHorizontal)
+            .padding(.bottom, Spacing.xxl)
         }
     }
 }
@@ -253,41 +331,71 @@ struct KeyboardSetupPage: View {
 
 struct ReadyPage: View {
     let onFinish: () -> Void
-    
+
     var body: some View {
         VStack(spacing: Spacing.xl) {
             ProgressIndicator(current: 4, total: 4)
                 .padding(.top, Spacing.lg)
-            
+                .padding(.horizontal, Spacing.pageHorizontal)
+
             Spacer()
-            
+
             VStack(spacing: Spacing.lg) {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 100))
-                    .foregroundStyle(AppColors.success)
-                
+                ZStack {
+                    Circle()
+                        .fill(.ultraThinMaterial)
+                        .frame(width: 140, height: 140)
+                        .overlay(
+                            Circle()
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [
+                                            Color.white.opacity(0.4),
+                                            Color.white.opacity(0.0)
+                                        ],
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    ),
+                                    lineWidth: 1.2
+                                )
+                        )
+                    Circle()
+                        .fill(AppColors.success.opacity(0.15))
+                        .frame(width: 110, height: 110)
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 56, weight: .bold, design: .rounded))
+                        .foregroundStyle(AppColors.success)
+                }
+                .shadow(color: AppColors.success.opacity(0.3), radius: 24, y: 12)
+
                 Text("You're All Set!")
-                    .font(.largeTitle.bold())
-                
-                Text("Press and hold the mic button to start dictating.")
-                    .font(.body)
+                    .font(.system(size: 32, weight: .bold, design: .rounded))
+                    .tracking(-0.5)
+
+                Text("Tap the mic on Home to start dictating. Your voice never leaves your phone.")
+                    .font(.system(size: 15, weight: .medium, design: .rounded))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, Spacing.xl)
             }
-            
+
             Spacer()
-            
+
             Button(action: onFinish) {
                 Text("Start Using VoiceFlow")
-                    .font(.headline)
+                    .font(.system(size: 17, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .frame(height: Sizing.buttonHeight)
+                    .background(
+                        Capsule()
+                            .fill(.appAccent)
+                    )
+                    .shadow(color: .appAccent.opacity(0.4), radius: 16, y: 8)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(.appAccent)
-            .padding(.horizontal, Spacing.md)
-            .padding(.bottom, Spacing.xl)
+            .buttonStyle(PressableButtonStyle())
+            .padding(.horizontal, Spacing.pageHorizontal)
+            .padding(.bottom, Spacing.xxl)
         }
     }
 }
@@ -297,15 +405,22 @@ struct ReadyPage: View {
 struct FeatureRow: View {
     let icon: String
     let title: String
-    
+    var tint: Color = .appAccent
+
     var body: some View {
         HStack(spacing: Spacing.md) {
-            Image(systemName: icon)
-                .font(.title2)
-                .foregroundStyle(.appAccent)
-                .frame(width: 32)
+            ZStack {
+                Circle()
+                    .fill(.ultraThinMaterial)
+                    .frame(width: 36, height: 36)
+                Image(systemName: icon)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(tint)
+            }
+
             Text(title)
-                .font(.body)
+                .font(.system(size: 16, weight: .semibold, design: .rounded))
+
             Spacer()
         }
     }
@@ -315,69 +430,120 @@ struct ModelPickerRow: View {
     let model: ModelDefinition
     let isSelected: Bool
     let onSelect: () -> Void
-    
+
     var body: some View {
         Button(action: onSelect) {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack {
+            HStack(spacing: Spacing.md) {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: Spacing.xs) {
                         Text(model.displayName)
-                            .font(.headline)
+                            .font(.system(size: 16, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.primary)
                         if model.id == "whisper-base" {
                             Text("Recommended")
-                                .font(.caption2)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(.appAccent.opacity(0.2))
+                                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(
+                                    Capsule()
+                                        .fill(.appAccent.opacity(0.25))
+                                )
                                 .foregroundStyle(.appAccent)
-                                .clipShape(Capsule())
                         }
                     }
                     Text("\(model.sizeString) · \(model.languageSummary)")
-                        .font(.caption)
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
+
                 Spacer()
+
                 if isSelected {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(.appAccent)
+                    ZStack {
+                        Circle()
+                            .fill(.appAccent)
+                            .frame(width: 24, height: 24)
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
                 }
             }
             .padding(Spacing.md)
-            .background(AppColors.surfaceDark)
-            .clipShape(RoundedRectangle(cornerRadius: Sizing.cornerRadius))
-            .overlay {
-                RoundedRectangle(cornerRadius: Sizing.cornerRadius)
-                    .stroke(isSelected ? Color.appAccent : .clear, lineWidth: 2)
-            }
+            .background(
+                RoundedRectangle(cornerRadius: Sizing.cardCornerRadius, style: .continuous)
+                    .fill(.ultraThinMaterial)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: Sizing.cardCornerRadius, style: .continuous)
+                    .stroke(
+                        isSelected
+                            ? LinearGradient(
+                                colors: [Color.appAccent, Color.appAccent.opacity(0.6)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                            : LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0.4),
+                                    Color.white.opacity(0.0)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            ),
+                        lineWidth: isSelected ? 2 : 1
+                    )
+            )
+            .shadow(color: .black.opacity(0.12), radius: 12, y: 6)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
     }
 }
 
 struct StepRow: View {
     let number: Int
     let text: String
-    
+
     var body: some View {
         HStack(spacing: Spacing.md) {
-            Text("\(number)")
-                .font(.headline)
-                .foregroundStyle(.white)
-                .frame(width: 28, height: 28)
-                .background(.appAccent)
-                .clipShape(Circle())
+            ZStack {
+                Circle()
+                    .fill(.appAccent)
+                    .frame(width: 32, height: 32)
+                Text("\(number)")
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+            }
             Text(text)
-                .font(.body)
+                .font(.system(size: 16, weight: .medium, design: .rounded))
             Spacer()
         }
+        .padding(Spacing.md)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(.ultraThinMaterial)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.4),
+                            Color.white.opacity(0.0)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ),
+                    lineWidth: 1
+                )
+        )
     }
 }
 
 struct ProgressIndicator: View {
     let current: Int
     let total: Int
-    
+
     var body: some View {
         HStack(spacing: Spacing.xs) {
             ForEach(0..<total, id: \.self) { i in
@@ -386,7 +552,6 @@ struct ProgressIndicator: View {
                     .frame(height: 4)
             }
         }
-        .padding(.horizontal, Spacing.md)
     }
 }
 

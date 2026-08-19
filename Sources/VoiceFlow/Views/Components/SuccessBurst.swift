@@ -2,19 +2,13 @@
 //  SuccessBurst.swift
 //  VoiceFlow
 //
-//  Celebratory animation shown when the first successful transcription
-//  completes. A subtle, one-shot burst of accent-colored particles +
-//  checkmark that auto-dismisses after ~1.2 s.
+//  iOS 26 inspired celebration animation — subtle, one-shot burst of
+//  accent-colored particles + checkmark that auto-dismisses after ~1.2 s.
+//  Uses iOS 26's Liquid Glass circle behind the checkmark for a
+//  translucent, floating appearance.
 //
 //  Designed to feel like Apple's "delight" moments (App Store download
 //  completed, podcast subscribed, etc.) without being over the top.
-//
-//  ## Design
-//
-//  - 12 particles fan out radially from the center, fading and shrinking
-//    over the lifetime.
-//  - A checkmark scales in with a spring animation as the burst starts.
-//  - Total duration: 1.2 s. Auto-dismissed via opacity transition.
 //
 
 import SwiftUI
@@ -47,8 +41,8 @@ struct SuccessBurst: View {
 
     // MARK: - Constants
 
-    private let particleCount = 12
-    private let totalDuration: Double = 1.2
+    private let particleCount = 14
+    private let totalDuration: Double = 1.4
     private let checkmarkDelay: Double = 0.15
 
     // MARK: - Body
@@ -61,17 +55,35 @@ struct SuccessBurst: View {
                     particleView(index: i)
                 }
 
-                // Checkmark
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 80))
-                    .foregroundStyle(tint)
-                    .background(
-                        Circle()
-                            .fill(.ultraThinMaterial)
-                            .frame(width: 110, height: 110)
-                    )
-                    .scaleEffect(checkmarkAppeared ? 1.0 : 0.3)
-                    .opacity(fading ? 0 : 1)
+                // Liquid Glass checkmark
+                ZStack {
+                    // Glass background circle
+                    Circle()
+                        .fill(.ultraThinMaterial)
+                        .frame(width: 130, height: 130)
+                        .overlay(
+                            Circle()
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [
+                                            Color.white.opacity(0.4),
+                                            Color.white.opacity(0.0)
+                                        ],
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    ),
+                                    lineWidth: 1.2
+                                )
+                        )
+                        .shadow(color: tint.opacity(0.4), radius: 24, y: 8)
+
+                    // Checkmark icon
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 56, weight: .bold, design: .rounded))
+                        .foregroundStyle(tint)
+                }
+                .scaleEffect(checkmarkAppeared ? 1.0 : 0.3)
+                .opacity(fading ? 0 : 1)
             }
         }
         .allowsHitTesting(false)  // Doesn't intercept gestures
@@ -87,7 +99,7 @@ struct SuccessBurst: View {
         // Angle for this particle — evenly spaced around the circle.
         let angle = Double(index) / Double(particleCount) * 2 * .pi
         // Distance traveled, eased out (fast then slow).
-        let rawDistance = easeOut(phase) * 120
+        let rawDistance = easeOut(phase) * 140
         let x = cos(angle) * rawDistance
         let y = sin(angle) * rawDistance
         // Size shrinks over time.
@@ -116,8 +128,11 @@ struct SuccessBurst: View {
         withAnimation(.linear(duration: totalDuration)) {
             phase = 1
         }
-        // Checkmark scale-in after a brief beat.
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.6).delay(checkmarkDelay)) {
+        // Checkmark scale-in after a brief beat. iOS 26 bouncy spring.
+        withAnimation(
+            .spring(response: 0.5, dampingFraction: 0.55, blendDuration: 0.1)
+                .delay(checkmarkDelay)
+        ) {
             checkmarkAppeared = true
         }
         // Start fading near the end, then dismiss.
@@ -160,8 +175,13 @@ struct SuccessBurst: View {
         var body: some View {
             ZStack {
                 AppColors.backgroundDark.ignoresSafeArea()
-                Button("Replay Burst") { active = false; DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { active = true } }
-                    .foregroundStyle(.white)
+                Button("Replay Burst") {
+                    active = false
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        active = true
+                    }
+                }
+                .foregroundStyle(.white)
                 SuccessBurst(isActive: $active)
             }
         }

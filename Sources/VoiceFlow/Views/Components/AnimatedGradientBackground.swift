@@ -2,18 +2,21 @@
 //  AnimatedGradientBackground.swift
 //  VoiceFlow
 //
-//  Reusable animated radial-gradient background.
+//  iOS 26 inspired animated radial-gradient background.
 //
-//  Inspired by modern iOS 18 app aesthetics — gives screens depth without
+//  Inspired by iOS 26's Liquid Glass aesthetic — gives screens depth without
 //  being distracting. Used by HomeView, OnboardingFlow, and RecordingView
 //  to unify the visual language across the app.
 //
 //  ## Design
 //
-//  - **Base color:** AppColors.backgroundDark (`#0A0A0F`) — same as plain
-//    solid background, so removing this view is a visual no-op.
+//  - **Base color:** AppColors.backgroundDark (iOS 26 deep dark with subtle
+//    purple tint) — same as plain solid background, so removing this view
+//    is a visual no-op.
 //  - **Accent halos:** two radial gradients in the brand accent (indigo)
-//    and a secondary violet, positioned in opposite corners.
+//    and a secondary violet, positioned in opposite corners. Use iOS 26's
+//    softer gradients (lower opacity, larger spread) for a more atmospheric
+//    feel.
 //  - **Animation:** halos drift slowly (60s cycle) along a Lissajous curve,
 //    giving the screen a subtle "breathing" feel without distracting motion.
 //
@@ -37,10 +40,9 @@ import SwiftUI
 
 /// A subtle, slow-moving radial-gradient background.
 ///
-/// Replaces the flat `#0A0A0F` background with two animated radial halos in
-/// the brand accent and a secondary violet, drifting along a Lissajous
-/// curve. Designed for dark-mode-by-default apps that want depth without
-/// noise.
+/// Replaces the flat dark background with two animated radial halos in
+/// the brand accent and a secondary color, drifting along a Lissajous
+/// curve. Designed for dark-mode apps that want depth without noise.
 ///
 /// The animation is `linear` over 60 s and loops forever; the loop is
 /// seamless because the start and end positions are identical.
@@ -55,8 +57,8 @@ struct AnimatedGradientBackground: View {
     /// Tint of the primary halo. Defaults to the brand accent (indigo).
     var primaryTint: Color = Color.appAccent
 
-    /// Tint of the secondary halo. Defaults to a violet for variety.
-    var secondaryTint: Color = Color(red: 0.45, green: 0.32, blue: 0.85)
+    /// Tint of the secondary halo. Defaults to iOS 26 violet.
+    var secondaryTint: Color = AppColors.violet
 
     /// Intensity multiplier for the halos (0 = invisible, 1 = default).
     var intensity: Double = 1.0
@@ -71,7 +73,20 @@ struct AnimatedGradientBackground: View {
 
     var body: some View {
         // Solid base layer — guarantees the background never goes transparent.
-        AppColors.backgroundDark
+        // iOS 26 deep dark with subtle purple tint.
+        ZStack {
+            AppColors.backgroundDark
+
+            // Subtle top-to-bottom gradient: slightly brighter at top.
+            LinearGradient(
+                colors: [
+                    Color(red: 0.07, green: 0.07, blue: 0.11),
+                    AppColors.backgroundDark
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        }
 
         // Halo layer — two radial gradients positioned via TimelineView.
         TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { context in
@@ -86,39 +101,61 @@ struct AnimatedGradientBackground: View {
                 // Primary halo — drifts in a Lissajous curve in the top-right.
                 RadialGradient(
                     colors: [
-                        primaryTint.opacity(0.28 * intensity),
+                        primaryTint.opacity(0.32 * intensity),
+                        primaryTint.opacity(0.12 * intensity),
                         primaryTint.opacity(0.0)
                     ],
                     center: haloPosition(
                         phase: computedPhase,
-                        baseX: 0.75,
-                        baseY: 0.25,
-                        amplitudeX: 0.15,
-                        amplitudeY: 0.10,
+                        baseX: 0.78,
+                        baseY: 0.22,
+                        amplitudeX: 0.18,
+                        amplitudeY: 0.12,
                         freqX: 1.0,
                         freqY: 1.3
                     ),
                     startRadius: 0,
-                    endRadius: 380
+                    endRadius: 480
                 )
 
                 // Secondary halo — drifts in the bottom-left, different curve.
                 RadialGradient(
                     colors: [
-                        secondaryTint.opacity(0.22 * intensity),
+                        secondaryTint.opacity(0.26 * intensity),
+                        secondaryTint.opacity(0.10 * intensity),
                         secondaryTint.opacity(0.0)
                     ],
                     center: haloPosition(
                         phase: computedPhase,
-                        baseX: 0.20,
-                        baseY: 0.80,
-                        amplitudeX: 0.18,
-                        amplitudeY: 0.12,
+                        baseX: 0.18,
+                        baseY: 0.78,
+                        amplitudeX: 0.20,
+                        amplitudeY: 0.14,
                         freqX: 1.1,
                         freqY: 0.9
                     ),
                     startRadius: 0,
-                    endRadius: 360
+                    endRadius: 440
+                )
+
+                // Tertiary accent halo — small, drifting in the middle
+                // for extra depth. iOS 26 layered look.
+                RadialGradient(
+                    colors: [
+                        AppColors.pink.opacity(0.16 * intensity),
+                        AppColors.pink.opacity(0.0)
+                    ],
+                    center: haloPosition(
+                        phase: computedPhase,
+                        baseX: 0.50,
+                        baseY: 0.50,
+                        amplitudeX: 0.25,
+                        amplitudeY: 0.20,
+                        freqX: 0.7,
+                        freqY: 1.4
+                    ),
+                    startRadius: 0,
+                    endRadius: 320
                 )
             }
             .blendMode(.plusLighter)  // Additive blending for soft glow
@@ -158,10 +195,15 @@ struct AnimatedGradientBackground: View {
         .ignoresSafeArea()
 }
 
-#Preview("Accent: Coral") {
+#Preview("Recording") {
+    AnimatedGradientBackground(intensity: 1.4)
+        .ignoresSafeArea()
+}
+
+#Preview("Coral") {
     AnimatedGradientBackground(
-        primaryTint: Color(red: 1.0, green: 0.30, blue: 0.43),
-        secondaryTint: Color(red: 1.0, green: 0.55, blue: 0.30)
+        primaryTint: AppColors.coral,
+        secondaryTint: AppColors.amber
     )
     .ignoresSafeArea()
 }
